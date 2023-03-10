@@ -35,7 +35,7 @@ fn toggle_button_system(
 
 fn main() {
 	App::new()
-		.insert_resource(Msaa::Sample4)
+		// .insert_resource(Msaa::Sample4)
 		.add_plugins(DefaultPlugins)
 		.add_startup_system(init)
         .add_startup_system(world_gen)

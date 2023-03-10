@@ -71,14 +71,14 @@ impl Block {
 }
 
 fn chunk_gen(
-    start_pos: (i32, i32),
+    start_pos: i32,
     height_map: &NoiseMap,
     meshes: &mut ResMut<Assets<Mesh>>,
 	materials: &mut ResMut<Assets<StandardMaterial>>,) -> Vec<Block> {
 
     let mut blocks = Vec::new();
 
-    let SIZE = 16;
+    let SIZE = 16 + start_pos;
 
     for x in -SIZE..SIZE {
         for z in -SIZE..SIZE {
@@ -117,8 +117,8 @@ pub fn world_gen(
 
     let mut chunks = Vec::new();
 
-    for i in 0..2 {
-        let chunk = chunk_gen((i * 16, i), &height_map, &mut meshes, &mut materials);
+    for i in 0..4 {
+        let chunk = chunk_gen(i * 16, &height_map, &mut meshes, &mut materials);
         chunks.push(chunk);
     }
 
@@ -127,34 +127,32 @@ pub fn world_gen(
     }
 }
 
-// pub fn world_gen(	
+// NEED TO SAVE THE HEIGHT MAP TO A FILE SO THAT IT DOESN'T HAVE TO BE GENERATED EVERY TIME THE GAME IS STARTED
+
+// pub fn update_chunks(
 //     mut commands: Commands,
-// 	mut meshes: ResMut<Assets<Mesh>>,
-// 	mut materials: ResMut<Assets<StandardMaterial>>,) {
-        
-//     let perlin = Perlin::new(random::<u32>());
-//     let mut blocks = Vec::new();
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<StandardMaterial>>,
+//     mut query: Query<(Entity, &Identity, &Name)>) {
 
-//     let SIZE = 16;
-
-//     for x in -SIZE..SIZE {
-//         for z in -SIZE..SIZE {
-//             let noise = perlin.get([rand::random::<f64>() + x as f64, rand::random::<f64>() + z as f64]);
-//             let height = (noise * 10.0) as i32;
-//             for y in -SIZE/10..height {
-//                 if y == height - 1 {
-//                     let block = Block::new("Grass", (x, y, z), &mut meshes, &mut materials);
-//                     blocks.push(block);
-//                 } else if y > height - 5 {
-//                     let block = Block::new("Dirt", (x, y, z), &mut meshes, &mut materials);
-//                     blocks.push(block);
-//                 } else {
-//                     let block = Block::new("Stone", (x, y, z), &mut meshes, &mut materials);
-//                     blocks.push(block);
-//                 }
-//             }
+//     // if a chunk is more than 4 chunks away from the player, delete it
+//     for (entity, id, name) in query.iter_mut() {
+//         if id.0 > 4 {
+//             commands.entity(entity).despawn();
 //         }
 //     }
-        
-//     commands.spawn_batch(blocks);
+
+//     // if a chunk is less than 4 chunks away from the player, generate it
+//     for i in 0..4 {
+//         let mut found = false;
+//         for (entity, id, name) in query.iter_mut() {
+//             if id.0 == i as u32 {
+//                 found = true;
+//             }
+//         }
+//         if !found {
+//             let chunk = chunk_gen(i * 16, &height_map, &mut meshes, &mut materials);
+//             commands.spawn_batch(chunk);
+//         }
+//     }
 // }
