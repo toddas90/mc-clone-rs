@@ -1,7 +1,12 @@
 use bevy::prelude::*;
-use rand::random;
+use bevy::utils::HashSet;
 use noise::{Perlin, Fbm};
 use noise::utils::{NoiseMapBuilder, PlaneMapBuilder, NoiseMap};
+
+const CHUNK_SIZE: i32 = 16;
+const VIEW_DISTANCE: i32 = CHUNK_SIZE * 4;
+const GENERATION_RADIUS: i32 = 4;
+const BUFFER_ZONE: i32 = 8;
 
 #[derive(Component)]
 pub struct Chunks {
@@ -25,17 +30,16 @@ struct Block {
 pub struct Chunk {
     blocks: Vec<Block>,
     height_map: NoiseMap,
-    contains_player: bool,
+    center_pos: IVec2,
 }
 
 impl Chunk {
     pub fn new(
-        start_pos: i32,
+        center_pos: IVec2,
         meshes: &mut ResMut<Assets<Mesh>>,
-        materials: &mut ResMut<Assets<StandardMaterial>>,) -> Self {
+        materials: &mut ResMut<Assets<StandardMaterial>>,
+    ) -> Self {
         let mut blocks = Vec::new();
-
-        let SIZE = 16 + start_pos;
 
         let fbm = Fbm::<Perlin>::new(rand::random());
 
@@ -45,8 +49,8 @@ impl Chunk {
                 .set_y_bounds(-5.0, 5.0)
                 .build();
 
-        for x in -SIZE..SIZE {
-            for z in -SIZE..SIZE {
+        for x in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
                 let noise = height_map.get_value(x as usize, z as usize);
                 let height = (noise * 10.0) as i32;
                 for y in 0..height {
@@ -66,25 +70,77 @@ impl Chunk {
         Self {
             blocks,
             height_map,
-            contains_player: false,
+            center_pos,
         }
     }
 
-    pub fn player_in_chunk(
-        &mut self,
-        player: &Query<&Transform, With<Camera>>,
-    ) {
-        for transform in self.blocks.iter_mut() {
-            for player_transform in player.iter() {
-                let distance = transform.object.transform.translation.distance(player_transform.translation);
-                if distance < 16.0 {
-                    self.contains_player = true;
+    fn get_visible_blocks(&self, camera_pos: IVec3, view_distance: i32) -> Vec<Block> {
+        let mut visible_blocks = Vec::new();
+
+        for block in &self.blocks {
+            if (block.object.transform.translation.x - camera_pos.x as f32).abs() < view_distance as f32
+                && (block.object.transform.translation.y - camera_pos.y as f32).abs() < view_distance as f32
+                && (block.object.transform.translation.z - camera_pos.z as f32).abs() < view_distance as f32
+            {
+                let new_block = block.clone();
+                visible_blocks.push(new_block);
+            }
+        }
+
+        visible_blocks
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct ChunkManager {
+    player_position: Vec3,
+    generation_radius: i32,
+    buffer_zone: i32,
+    loaded_chunks: HashSet<IVec2>,
+}
+
+impl ChunkManager {
+    pub fn new(player_position: Vec3, generation_radius: i32, buffer_zone: i32) -> Self {
+        Self {
+            player_position,
+            generation_radius,
+            buffer_zone,
+            loaded_chunks: HashSet::new(),
+        }
+    }
+
+    pub fn update(&mut self, player_position: Vec3) {
+        let player_chunk = IVec2::new(
+            player_position.x.floor() as i32 / CHUNK_SIZE as i32,
+            player_position.z.floor() as i32 / CHUNK_SIZE as i32,
+        );
+
+        for x in player_chunk.x - self.generation_radius..player_chunk.x + self.generation_radius {
+            for z in player_chunk.y - self.generation_radius..player_chunk.y + self.generation_radius {
+                let chunk_pos = IVec2::new(x, z);
+                if !self.loaded_chunks.contains(&chunk_pos) {
+                    // Generate new chunk
+                    self.loaded_chunks.insert(chunk_pos);
                 }
             }
         }
-        self.contains_player = false;
+
+        let mut chunks_to_remove = Vec::new();
+        for chunk_pos in self.loaded_chunks.iter() {
+            let dist = ((chunk_pos.x - player_chunk.x).pow(2) + (chunk_pos.y - player_chunk.y).pow(2)) as f32;
+            if dist > (self.generation_radius + self.buffer_zone).pow(2) as f32 {
+                // Chunk is outside buffer zone, remove it
+                chunks_to_remove.push(*chunk_pos);
+            }
+        }
+
+        for chunk_pos in chunks_to_remove {
+            self.loaded_chunks.remove(&chunk_pos);
+            // Delete chunk
+        }
     }
 }
+
 
 impl Block {
     pub fn new(
@@ -131,95 +187,47 @@ impl Block {
     }
 }
 
-// Remove Chunks that are more than 4 chunks away from the camera/player in each direction
-pub fn chunk_cleanup(
-    mut commands: Commands,
-    mut chunks: Query<(Entity, &mut Chunk), With<Chunks>>,
-    player: Query<&Transform, With<Camera>>,
-) {
-    for (_, mut chunk) in chunks.iter_mut() {
-        chunk.player_in_chunk(&player);
-    }
-
-    for player_transform in player.iter() {
-        let x = player_transform.translation.x;
-        let z = player_transform.translation.z;
-
-        let mut x_chunk = x / 16.0;
-        let mut z_chunk = z / 16.0;
-
-        if x_chunk < 0.0 {
-            x_chunk -= 1.0;
-        }
-        if z_chunk < 0.0 {
-            z_chunk -= 1.0;
-        }
-
-        let x_chunk = x_chunk as i32;
-        let z_chunk = z_chunk as i32;
-
-        for chunk in chunks.iter() {
-            let chunk_x = chunk.1.blocks[0].object.transform.translation.x;
-            let chunk_z = chunk.1.blocks[0].object.transform.translation.z;
-
-            if chunk_x < x_chunk as f32 - 4.0 || chunk_x > x_chunk as f32 + 4.0 || chunk_z < z_chunk as f32 - 4.0 || chunk_z > z_chunk as f32 + 4.0 {
-                commands.entity(chunk.0).despawn_recursive();
-            }
-        }
-    }
-}
-
-// Add Chunks that are less than 4 chunks away from the camera/player and that don't already exist
-pub fn chunk_generation(
-    mut commands: Commands,
-    chunks: Query<(Entity, &mut Chunk), With<Chunks>>,
-    player: Query<&Transform, With<Camera>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,) {
-        // From the chunk containing the player, generate chunks in each direction until 4 chunks away
-        // Unless they already exist
-        for player_transform in player.iter() {
-            let x = player_transform.translation.x;
-            let z = player_transform.translation.z;
-
-            let mut x_chunk = x / 16.0;
-            let mut z_chunk = z / 16.0;
-
-            if x_chunk < 0.0 {
-                x_chunk -= 1.0;
-            }
-            if z_chunk < 0.0 {
-                z_chunk -= 1.0;
-            }
-
-            let x_chunk = x_chunk as i32;
-            let z_chunk = z_chunk as i32;
-
-            for x in x_chunk..x_chunk + 4 {
-                for z in z_chunk..z_chunk + 4 {
-                    let chunk = Chunk::new(16 * x, &mut meshes, &mut materials);
-                    commands.spawn_batch(chunk.blocks);
-                }
-            }
-        }
-}
-
 pub fn init_world(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,) {
-        // Generate the first four chunks
-        let mut initial = Chunks {
-            chunks: Vec::new(),
-        };
-
-        for i in 0..4 {
-            let chunk = Chunk::new(16 * i, &mut meshes, &mut materials);
-            initial.chunks.push(chunk);
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut chunk_manager: ResMut<ChunkManager>,) {
+        for x in 0..4 {
+            for z in 0..4 {
+                let chunk = Chunk::new(IVec2::new(x, z), &mut meshes, &mut materials);
+                chunk_manager.loaded_chunks.insert(IVec2::new(x, z));
+            }
         }
+}
 
-        // Spawn the chunks
-        for chunk in initial.chunks {
-            commands.spawn_batch(chunk.blocks);
-        }
+pub fn chunk_generation(
+    mut commands: Commands,
+    mut chunk_manager: ResMut<ChunkManager>,
+    player: Query<&Transform, With<Camera>>,
+    query: Query<&Chunk>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>
+) {
+    let mut pos = IVec3::new(0, 0, 0);
+
+    for player_transform in player.iter() {
+        pos = IVec3::new(
+            player_transform.translation.x.floor() as i32,
+            player_transform.translation.y.floor() as i32,
+            player_transform.translation.z.floor() as i32,
+        );
+    }
+
+    chunk_manager.update(pos.as_vec3());
+
+    let mut visible_blocks = Vec::new();
+
+    // Generate the chunks in the chunk manager
+    for chunk in chunk_manager.loaded_chunks.iter() {
+        let chunk = Chunk::new(*chunk, &mut meshes, &mut materials);
+        let visible = chunk.get_visible_blocks(pos, VIEW_DISTANCE);
+        visible_blocks.extend(visible);
+    }
+
+    commands.spawn_batch(visible_blocks);
 }

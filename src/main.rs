@@ -1,4 +1,8 @@
-use bevy::prelude::*;
+use bevy::{
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    prelude::*,
+    window::{CursorGrabMode, PresentMode, WindowResolution, WindowMode, Cursor},
+};
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 
 mod world;
@@ -17,7 +21,7 @@ fn init(mut commands: Commands,) {
 		.spawn(Camera3dBundle::default())
 		.insert(FlyCamera::default());
 
-	println!("Started example!");
+	println!("Started Camera!");
 }
 
 // Press "T" to toggle keyboard+mouse control over the camera
@@ -36,11 +40,21 @@ fn toggle_button_system(
 fn main() {
 	App::new()
 		// .insert_resource(Msaa::Sample4)
-		.add_plugins(DefaultPlugins)
+		.add_plugins(DefaultPlugins.set(WindowPlugin {
+			primary_window: Some(Window {
+				title: "Minecraft".to_string(),
+				resolution: WindowResolution::new(1920.0, 1080.0),
+				mode: WindowMode::Windowed,
+				..Default::default()
+			}),
+			..Default::default()
+		}))
+		.add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
 		.add_startup_system(init)
 		.add_startup_system(init_world)
-        // .add_system(chunk_generation)
-		// .add_system(chunk_cleanup)
+        .init_resource::<ChunkManager>()
+		.add_system(chunk_generation)
 		.add_plugin(FlyCameraPlugin)
 		.add_system(toggle_button_system)
 		.run();
