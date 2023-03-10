@@ -10,7 +10,7 @@ use world::*;
 
 fn init(mut commands: Commands,) {
 	commands.spawn(DirectionalLightBundle {
-		transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
+		transform: Transform::from_translation(Vec3::new(10.0, 10.0, 10.0)),
 		..Default::default()
 	});
 	commands
@@ -38,7 +38,9 @@ fn main() {
 		// .insert_resource(Msaa::Sample4)
 		.add_plugins(DefaultPlugins)
 		.add_startup_system(init)
-        .add_startup_system(world_gen)
+		.add_startup_system(init_world)
+        // .add_system(chunk_generation)
+		// .add_system(chunk_cleanup)
 		.add_plugin(FlyCameraPlugin)
 		.add_system(toggle_button_system)
 		.run();
