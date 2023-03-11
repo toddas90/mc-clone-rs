@@ -1,19 +1,17 @@
-use std::collections::BTreeSet;
-
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use noise::{Perlin, Fbm};
-use noise::utils::{NoiseMapBuilder, PlaneMapBuilder};
+use noise::utils::{NoiseMapBuilder, PlaneMapBuilder, NoiseMap};
+use rayon::prelude::*;
 
 const CHUNK_SIZE: i32 = 4;
 const VIEW_DISTANCE: i32 = 4;
 const GENERATION_RADIUS: i32 = 1;
 const CACHE_SIZE: i32 = 1;
-
-#[derive(Resource, Clone)]
-pub struct NoiseGenerator {
-    noise: Fbm<Perlin>,
-}
+const SEED : u32 = 0;
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Position {
@@ -27,9 +25,9 @@ pub struct Block {
     position: Position,
 }
 
-#[derive(Component, Clone, PartialEq, Eq, Hash)]
+#[derive(Component, Clone)]
 pub struct Chunk {
-    blocks: BTreeSet<Block>,
+    blocks: HashSet<Block>,
     center_pos: IVec2,
 }
 
@@ -37,13 +35,6 @@ pub struct Chunk {
 pub struct ChunkManager {
     visible_chunks: HashSet<Chunk>,
     chunk_cache: HashSet<Chunk>,
-}
-
-impl FromWorld for NoiseGenerator {
-    fn from_world(_world: &mut World) -> Self {
-        let noise = Fbm::<Perlin>::new(rand::random());
-        Self { noise }
-    }
 }
 
 impl Position {
@@ -70,12 +61,29 @@ impl Block {
     }
 }
 
+impl Hash for Chunk {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
+        let mut hasher = DefaultHasher::new();
+        self.center_pos.hash(&mut hasher);
+        hasher.finish();
+    }
+}
+
+impl PartialEq for Chunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.center_pos == other.center_pos
+    }
+}
+
+impl Eq for Chunk {}
+
 impl Chunk {
     pub fn new(
         center_pos: IVec2,
-        fbm: &Fbm<Perlin>,
     ) -> Self {
-        let mut blocks = BTreeSet::new();
+        let mut blocks = HashSet::new();
+
+        let fbm = Fbm::<Perlin>::new(SEED);
 
         let height_map = PlaneMapBuilder::<_, 2>::new(&fbm)
                 .set_size(1024, 1024)
@@ -100,52 +108,32 @@ impl Chunk {
     }
 }
 
-impl ChunkManager {
-    // pub fn new() -> Self {
-    //     Self {
-    //         visible_chunks: HashSet::new(),
-    //         chunk_cache: HashSet::new(),
-    //     }
-    // }
-
-    pub fn update(
-        &mut self,
-        camera_pos: IVec3,
-        fbm: Res<NoiseGenerator>,
-    ) {
+impl ChunkManager {  
+    pub fn update(&mut self, camera_pos: IVec3) {
         let chunk_x = camera_pos.x / CHUNK_SIZE;
         let chunk_z = camera_pos.z / CHUNK_SIZE;
-        let mut new_visible_chunks = HashSet::new();
-
-        for x in -GENERATION_RADIUS..GENERATION_RADIUS {
-            for z in -GENERATION_RADIUS..GENERATION_RADIUS {
-                for chunk in self.visible_chunks.iter() {
-                    if chunk.center_pos.x == chunk_x + x && chunk.center_pos.y == chunk_z + z {
-                        continue;
-                    }
+        let new_visible_chunks = Mutex::new(HashSet::new());
+        let new_chunk_cache = HashSet::new();
+    
+        let chunks = (0..GENERATION_RADIUS * 2)
+            .flat_map(|x| (0..GENERATION_RADIUS * 2).map(move |z| (x - GENERATION_RADIUS, z - GENERATION_RADIUS)))
+            .collect::<Vec<_>>();
+    
+        chunks.par_iter().for_each(|(x, z)| {
+            for chunk in self.visible_chunks.iter().chain(self.chunk_cache.iter()) {
+                if chunk.center_pos.x == chunk_x + x && chunk.center_pos.y == chunk_z + z {
+                    return;
                 }
-                let chunk = Chunk::new(IVec2::new(chunk_x + x, chunk_z + z), &fbm.noise);
-                new_visible_chunks.insert(chunk);
             }
-        }
-
-        let mut new_chunk_cache = HashSet::new();
-        for x in -CACHE_SIZE..CACHE_SIZE {
-            for z in -CACHE_SIZE..CACHE_SIZE {
-                for chunk in self.visible_chunks.iter() {
-                    if chunk.center_pos.x == chunk_x + x && chunk.center_pos.y == chunk_z + z {
-                        continue;
-                    }
-                }
-                let chunk = Chunk::new(IVec2::new(chunk_x + x, chunk_z + z), &fbm.noise);
-                new_chunk_cache.insert(chunk);
-            }
-        }
-        self.visible_chunks = new_visible_chunks;
-        self.chunk_cache = new_chunk_cache;
+            let chunk = Chunk::new(IVec2::new(chunk_x + x, chunk_z + z));
+            new_visible_chunks.lock().unwrap().insert(chunk);
+        });
+    
+        self.visible_chunks.extend(new_visible_chunks.lock().unwrap().iter().cloned());
+        self.chunk_cache.extend(new_chunk_cache);
     }
 
-    pub fn render_chunks(
+    pub fn load_chunks(
         &self,
         commands: &mut Commands,
         meshes: &mut ResMut<Assets<Mesh>>,
@@ -191,11 +179,10 @@ pub fn init_world(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    fbm: Res<NoiseGenerator>,
     mut chunk_manager: ResMut<ChunkManager>,
 ) {
-    chunk_manager.update(IVec3::new(0, 0, 0), fbm);
-    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials, IVec3::new(0, 0, 0));
+    chunk_manager.update(IVec3::new(0, 0, 0));
+    chunk_manager.load_chunks(&mut commands, &mut meshes, &mut materials, IVec3::new(1, 1, 1));
     println!("World initialized");
 }
 
@@ -204,7 +191,6 @@ pub fn update_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut chunk_manager: ResMut<ChunkManager>,
-    fbm: Res<NoiseGenerator>,
     camera: Query<&Transform, With<Camera>>,
     entities: Query<Entity, With<Block>>,
 ) {
@@ -217,8 +203,8 @@ pub fn update_world(
     );
 
     // Update the chunk data
-    chunk_manager.update(pos, fbm);
+    chunk_manager.update(pos);
     chunk_manager.unload_chunks(&mut commands, pos, entities);
-    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials, pos);
+    chunk_manager.load_chunks(&mut commands, &mut meshes, &mut materials, pos);
     println!("World updated");
 }

@@ -1,7 +1,7 @@
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
-    window::{Cursor, CursorGrabMode, PresentMode, WindowMode, WindowResolution},
+    window::{WindowMode, WindowResolution},
 };
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 
@@ -24,16 +24,6 @@ fn init(mut commands: Commands) {
     println!("Started Camera!");
 }
 
-// Press "T" to toggle keyboard+mouse control over the camera
-fn toggle_button_system(input: Res<Input<KeyCode>>, mut query: Query<&mut FlyCamera>) {
-    for mut options in query.iter_mut() {
-        if input.just_pressed(KeyCode::T) {
-            println!("Toggled FlyCamera enabled!");
-            options.enabled = !options.enabled;
-        }
-    }
-}
-
 fn main() {
     App::new()
         // .insert_resource(Msaa::Sample4)
@@ -48,12 +38,10 @@ fn main() {
         }))
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-		.init_resource::<NoiseGenerator>()
+		.add_plugin(FlyCameraPlugin)
 		.init_resource::<ChunkManager>()
         .add_startup_system(init)
         .add_startup_system(init_world)
 		.add_system(update_world)
-        .add_plugin(FlyCameraPlugin)
-        .add_system(toggle_button_system)
         .run();
 }
