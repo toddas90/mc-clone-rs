@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use noise::{Perlin, Fbm};
-use noise::utils::{NoiseMapBuilder, PlaneMapBuilder, NoiseMap};
+use noise::utils::{NoiseMapBuilder, PlaneMapBuilder};
 use rayon::prelude::*;
 
 const CHUNK_SIZE: i32 = 4;
@@ -140,6 +140,7 @@ impl ChunkManager {
         materials: &mut ResMut<Assets<StandardMaterial>>,
         camera_pos: IVec3,
     ) {
+        // MAKE THIS PARALLEL!!!
         // Render the visible blocks in the visible chunks
         for chunk in self.visible_chunks.iter() {
             for block in chunk.blocks.iter() {
@@ -174,6 +175,8 @@ impl ChunkManager {
         }
     }
 }
+
+// Rather than generating terrain, this generates a 3d grid...
 
 pub fn init_world(
     mut commands: Commands,
