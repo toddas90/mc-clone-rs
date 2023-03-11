@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use noise::{Perlin, Fbm};
-use noise::utils::{NoiseMapBuilder, PlaneMapBuilder, NoiseMap};
+use noise::utils::{NoiseMapBuilder, PlaneMapBuilder};
 
-const CHUNK_SIZE: i32 = 16;
-const VIEW_DISTANCE: i32 = CHUNK_SIZE * GENERATION_RADIUS;
-const GENERATION_RADIUS: i32 = 4;
-const CACHE_SIZE: i32 = 8;
+const CHUNK_SIZE: i32 = 4;
+const VIEW_DISTANCE: i32 = 4;
+const GENERATION_RADIUS: i32 = 1;
+const CACHE_SIZE: i32 = 1;
 
 #[derive(Resource, Clone)]
 pub struct NoiseGenerator {
@@ -23,9 +23,8 @@ struct Position {
 }
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct Block {
+pub struct Block {
     position: Position,
-    is_visible: bool,
 }
 
 #[derive(Component, Clone, PartialEq, Eq, Hash)]
@@ -41,7 +40,7 @@ pub struct ChunkManager {
 }
 
 impl FromWorld for NoiseGenerator {
-    fn from_world(world: &mut World) -> Self {
+    fn from_world(_world: &mut World) -> Self {
         let noise = Fbm::<Perlin>::new(rand::random());
         Self { noise }
     }
@@ -57,11 +56,10 @@ impl Block {
     fn new(position: IVec3) -> Self {
         Self {
             position: Position::new(position.x, position.y, position.z),
-            is_visible: false,
         }
     }
 
-    fn is_visible(&self, camera_pos: IVec3) -> bool {
+    fn is_visible(self, camera_pos: IVec3) -> bool {
         let x = self.position.x;
         let z = self.position.z;
         let chunk_x = camera_pos.x / CHUNK_SIZE;
@@ -103,12 +101,12 @@ impl Chunk {
 }
 
 impl ChunkManager {
-    pub fn new() -> Self {
-        Self {
-            visible_chunks: HashSet::new(),
-            chunk_cache: HashSet::new(),
-        }
-    }
+    // pub fn new() -> Self {
+    //     Self {
+    //         visible_chunks: HashSet::new(),
+    //         chunk_cache: HashSet::new(),
+    //     }
+    // }
 
     pub fn update(
         &mut self,
@@ -118,15 +116,27 @@ impl ChunkManager {
         let chunk_x = camera_pos.x / CHUNK_SIZE;
         let chunk_z = camera_pos.z / CHUNK_SIZE;
         let mut new_visible_chunks = HashSet::new();
+
         for x in -GENERATION_RADIUS..GENERATION_RADIUS {
             for z in -GENERATION_RADIUS..GENERATION_RADIUS {
+                for chunk in self.visible_chunks.iter() {
+                    if chunk.center_pos.x == chunk_x + x && chunk.center_pos.y == chunk_z + z {
+                        continue;
+                    }
+                }
                 let chunk = Chunk::new(IVec2::new(chunk_x + x, chunk_z + z), &fbm.noise);
                 new_visible_chunks.insert(chunk);
             }
         }
+
         let mut new_chunk_cache = HashSet::new();
         for x in -CACHE_SIZE..CACHE_SIZE {
             for z in -CACHE_SIZE..CACHE_SIZE {
+                for chunk in self.visible_chunks.iter() {
+                    if chunk.center_pos.x == chunk_x + x && chunk.center_pos.y == chunk_z + z {
+                        continue;
+                    }
+                }
                 let chunk = Chunk::new(IVec2::new(chunk_x + x, chunk_z + z), &fbm.noise);
                 new_chunk_cache.insert(chunk);
             }
@@ -140,12 +150,14 @@ impl ChunkManager {
         commands: &mut Commands,
         meshes: &mut ResMut<Assets<Mesh>>,
         materials: &mut ResMut<Assets<StandardMaterial>>,
+        camera_pos: IVec3,
     ) {
+        // Render the visible blocks in the visible chunks
         for chunk in self.visible_chunks.iter() {
             for block in chunk.blocks.iter() {
-                if block.is_visible {
+                if block.is_visible(camera_pos) {
                     commands.spawn(PbrBundle {
-                        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+                        mesh: meshes.add(Mesh::from(shape::Cube { size: 0.5 })),
                         material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
                         transform: Transform::from_translation(Vec3::new(
                             block.position.x as f32,
@@ -158,6 +170,21 @@ impl ChunkManager {
             }
         }
     }
+
+    pub fn unload_chunks(
+        &self,
+        commands: &mut Commands,
+        camera_pos: IVec3,
+        query: Query<Entity, With<Block>>,
+    ) {
+        for entity in query.iter() {
+            let block = query.get(entity).unwrap();
+            let object: &Block = query.get_component(entity).unwrap();
+            if !object.is_visible(camera_pos) {
+                commands.entity(block).despawn();
+            }
+        }
+    }
 }
 
 pub fn init_world(
@@ -165,12 +192,11 @@ pub fn init_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     fbm: Res<NoiseGenerator>,
+    mut chunk_manager: ResMut<ChunkManager>,
 ) {
-
-    let mut chunk_manager = ChunkManager::new();
     chunk_manager.update(IVec3::new(0, 0, 0), fbm);
-    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials);
-    commands.insert_resource(chunk_manager);
+    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials, IVec3::new(0, 0, 0));
+    println!("World initialized");
 }
 
 pub fn update_world(
@@ -180,17 +206,19 @@ pub fn update_world(
     mut chunk_manager: ResMut<ChunkManager>,
     fbm: Res<NoiseGenerator>,
     camera: Query<&Transform, With<Camera>>,
+    entities: Query<Entity, With<Block>>,
 ) {
-    let mut pos = IVec3::new(0, 0, 0);
+    // Get camera position
+    let pos = camera.single();
+    let pos = IVec3::new(
+        pos.translation.x.floor() as i32,
+        pos.translation.y.floor() as i32,
+        pos.translation.z.floor() as i32,
+    );
 
-    for player_transform in camera.iter() {
-        pos = IVec3::new(
-            player_transform.translation.x.floor() as i32,
-            player_transform.translation.y.floor() as i32,
-            player_transform.translation.z.floor() as i32,
-        );
-    }
-
+    // Update the chunk data
     chunk_manager.update(pos, fbm);
-    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials);
+    chunk_manager.unload_chunks(&mut commands, pos, entities);
+    chunk_manager.render_chunks(&mut commands, &mut meshes, &mut materials, pos);
+    println!("World updated");
 }

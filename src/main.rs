@@ -49,6 +49,7 @@ fn main() {
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
 		.init_resource::<NoiseGenerator>()
+		.init_resource::<ChunkManager>()
         .add_startup_system(init)
         .add_startup_system(init_world)
 		.add_system(update_world)
