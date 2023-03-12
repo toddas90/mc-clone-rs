@@ -2070,6 +2070,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_fly_camera",
+ "fxhash",
  "noise",
  "rand 0.8.5",
  "rayon",
