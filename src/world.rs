@@ -11,43 +11,16 @@ use rayon::prelude::*;
 const CHUNK_SIZE: i32 = 16;
 const SEED : u32 = 69;
 
-// ---------- Position ----------
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-struct Position {
-    x: i32,
-    y: i32,
-    z: i32,
-}
-
-impl Position {
-    fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
-    fn from_ivec3(pos: IVec3) -> Self {
-        Self {
-            x: pos.x,
-            y: pos.y,
-            z: pos.z,
-        }
-    }
-
-    fn to_ivec3(&self) -> IVec3 {
-        IVec3::new(self.x, self.y, self.z)
-    }
-}
-// ------------------------------
-
 // ---------- Block ----------
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Block {
-    position: Position,
+    position: IVec3,
 }
 
 impl Block {
     fn new(position: IVec3) -> Self {
         Self {
-            position: Position::new(position.x, position.y, position.z),
+            position: position,
         }
     }
 }
@@ -87,14 +60,14 @@ impl Chunk {
         let mut indicies = Vec::new();
 
         let visible_blocks = self.blocks.par_iter().filter(|block| {
-            let block_pos = block.position.to_ivec3();
+            let block_pos = block.position;
             let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
             let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
 
             // Check if the block is surrounded by other blocks
             // If it is, don't render it
             self.blocks.par_iter().any(|other_block| {
-                let other_block_pos = other_block.position.to_ivec3();
+                let other_block_pos = other_block.position;
                 let other_block_pos = Vec3::new(other_block_pos.x as f32, other_block_pos.y as f32, other_block_pos.z as f32);
                 let other_block_pos = other_block_pos + Vec3::new(0.5, 0.5, 0.5);
 
@@ -103,32 +76,10 @@ impl Chunk {
             })
         }).collect::<Vec<_>>();
 
-        // let visible_blocks = Arc::new(Mutex::new(Vec::<Block>::new()));
-
-        // self.blocks.par_iter().for_each(|block| {
-        //     let block_pos = block.position.to_ivec3();
-        //     let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
-        //     let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
-
-        //     // Check if the block is surrounded by other blocks
-        //     // If it is, don't render it
-        //     visible_blocks.lock().unwrap().extend(self.blocks.par_iter().filter(|other_block| {
-        //         let other_block_pos = other_block.position.to_ivec3();
-        //         let other_block_pos = Vec3::new(other_block_pos.x as f32, other_block_pos.y as f32, other_block_pos.z as f32);
-        //         let other_block_pos = other_block_pos + Vec3::new(0.5, 0.5, 0.5);
-
-        //         let distance = block_pos.distance(other_block_pos);
-        //         distance > 1.0
-        //     }).collect::<Vec<_>>());
-        // });
-
-        // Drop the Mutex lock
-        // let visible_blocks = visible_blocks.lock().unwrap().clone();
-
         // For each visible block, get the verticies and indicies that are not back to back with other blocks.
         // This will result in a smaller mesh, and less draw calls.
         visible_blocks.iter().for_each(|block| {
-            let block_pos = block.position.to_ivec3();
+            let block_pos = block.position;
             let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
             let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
 
