@@ -6,7 +6,6 @@ use noise::{Fbm, Perlin};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use std::sync::{Arc, Mutex};
 
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 69;
@@ -29,23 +28,17 @@ impl Block {
 pub struct Chunk {
     blocks: HashSet<Block>,
     mesh: Handle<Mesh>,
-    start_pos: IVec2,
 }
 
 impl Chunk {
-    fn new(start_pos: IVec2) -> Self {
+    fn new() -> Self {
         Self {
             blocks: HashSet::new(),
             mesh: Default::default(),
-            start_pos,
         }
     }
 
     fn gen_blocks(&mut self, noise: &NoiseMap) {
-        println!(
-            "Generating blocks for chunk at ({}, {})",
-            self.start_pos.x, self.start_pos.y
-        );
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 let height = noise.get_value(x as usize, z as usize) * 10.0;
@@ -224,7 +217,7 @@ impl Chunk {
 #[derive(Resource)]
 pub struct Map {
     chunks: HashMap<IVec2, Chunk>,
-    cache: HashMap<IVec2, Chunk>,
+    // cache: HashMap<IVec2, Chunk>,
     noise: NoiseMap,
 }
 
@@ -240,7 +233,7 @@ impl FromWorld for Map {
 
         Map {
             chunks: HashMap::new(),
-            cache: HashMap::new(),
+            // cache: HashMap::new(),
             noise: height_map,
         }
     }
@@ -258,7 +251,8 @@ pub fn initialize_world(
     for x in 0..4 {
         for y in 0..4 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            let mut chunk = Chunk::new(chunk_pos);
+            println!("Generating chunk at {:?}", chunk_pos);
+            let mut chunk = Chunk::new();
             chunk.gen_blocks(&map.noise);
             chunk.mesh = meshes.add(chunk.gen_mesh());
             map.chunks.insert(chunk_pos, chunk);
