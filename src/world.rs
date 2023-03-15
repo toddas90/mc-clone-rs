@@ -1,40 +1,22 @@
-use std::hash::{Hash, Hasher};
-use fxhash::FxHasher;
+use std::hash::{Hash};
 use std::sync::{Mutex, Arc};
-use bevy::{prelude::*, transform};
-use bevy::utils::HashSet;
+use bevy::render::mesh::Indices;
+use bevy::render::render_resource::{PrimitiveTopology};
+use bevy::{prelude::*};
+use std::collections::{HashSet, HashMap};
 use noise::{Perlin, Fbm};
-use noise::utils::{NoiseMapBuilder, PlaneMapBuilder};
+use noise::utils::{NoiseMapBuilder, PlaneMapBuilder, NoiseMap};
 use rayon::prelude::*;
 
 const CHUNK_SIZE: i32 = 16;
-const VIEW_DISTANCE: i32 = 2;
-const GENERATION_RADIUS: i32 = 2;
 const SEED : u32 = 69;
 
+// ---------- Position ----------
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 struct Position {
     x: i32,
     y: i32,
     z: i32,
-}
-
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Block {
-    position: Position,
-}
-
-#[derive(Component, Clone)]
-pub struct Chunk {
-    blocks: HashSet<Block>,
-    center_pos: IVec2,
-    rendered: bool,
-}
-
-#[derive(Resource, Default)]
-pub struct ChunkManager {
-    visible_chunks: HashSet<Chunk>,
-    chunk_cache: HashSet<Chunk>,
 }
 
 impl Position {
@@ -49,6 +31,17 @@ impl Position {
             z: pos.z,
         }
     }
+
+    fn to_ivec3(&self) -> IVec3 {
+        IVec3::new(self.x, self.y, self.z)
+    }
+}
+// ------------------------------
+
+// ---------- Block ----------
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug)]
+struct Block {
+    position: Position,
 }
 
 impl Block {
@@ -58,198 +51,229 @@ impl Block {
         }
     }
 }
+// --------------------------
 
-impl Hash for Chunk {
-    fn hash<H: Hasher>(&self, _state: &mut H) {
-        let mut hasher = FxHasher::default();
-        self.center_pos.hash(&mut hasher);
-        hasher.finish();
-    }
+// ---------- Chunk ----------
+#[derive(Component, Clone)]
+pub struct Chunk {
+    blocks: HashSet<Block>,
+    mesh: Mesh,
+    start_pos: IVec2,
 }
-
-impl PartialEq for Chunk {
-    fn eq(&self, other: &Self) -> bool {
-        self.center_pos == other.center_pos
-    }
-}
-
-impl Eq for Chunk {}
 
 impl Chunk {
-    pub fn new(
-        center_pos: IVec2,
-    ) -> Self {
+    fn new(start_pos: IVec2) -> Self {
+        Self {
+            blocks: HashSet::new(),
+            mesh: Mesh::new(PrimitiveTopology::TriangleList),
+            start_pos,
+        }
+    }
+
+    fn gen_blocks(&mut self, noise: &NoiseMap) {
+        println!("Generating blocks for chunk at ({}, {})", self.start_pos.x, self.start_pos.y);
+        for x in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                let height = noise.get_value(x as usize, z as usize) * 10.0;
+                for y in 0..height as i32 {
+                    self.blocks.insert(Block::new(IVec3::new(x, y, z)));
+                }
+            }
+        }
+    }
+
+    fn gen_mesh(&mut self) {
+        let mut verticies = Vec::new();
+        let mut indicies = Vec::new();
+
+        let visible_blocks = self.blocks.par_iter().filter(|block| {
+            let block_pos = block.position.to_ivec3();
+            let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
+            let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
+
+            // Check if the block is surrounded by other blocks
+            // If it is, don't render it
+            self.blocks.par_iter().any(|other_block| {
+                let other_block_pos = other_block.position.to_ivec3();
+                let other_block_pos = Vec3::new(other_block_pos.x as f32, other_block_pos.y as f32, other_block_pos.z as f32);
+                let other_block_pos = other_block_pos + Vec3::new(0.5, 0.5, 0.5);
+
+                let distance = block_pos.distance(other_block_pos);
+                distance > 1.0
+            })
+        }).collect::<Vec<_>>();
+
+        // let visible_blocks = Arc::new(Mutex::new(Vec::<Block>::new()));
+
+        // self.blocks.par_iter().for_each(|block| {
+        //     let block_pos = block.position.to_ivec3();
+        //     let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
+        //     let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
+
+        //     // Check if the block is surrounded by other blocks
+        //     // If it is, don't render it
+        //     visible_blocks.lock().unwrap().extend(self.blocks.par_iter().filter(|other_block| {
+        //         let other_block_pos = other_block.position.to_ivec3();
+        //         let other_block_pos = Vec3::new(other_block_pos.x as f32, other_block_pos.y as f32, other_block_pos.z as f32);
+        //         let other_block_pos = other_block_pos + Vec3::new(0.5, 0.5, 0.5);
+
+        //         let distance = block_pos.distance(other_block_pos);
+        //         distance > 1.0
+        //     }).collect::<Vec<_>>());
+        // });
+
+        // Drop the Mutex lock
+        // let visible_blocks = visible_blocks.lock().unwrap().clone();
+
+        // For each visible block, get the verticies and indicies that are not back to back with other blocks.
+        // This will result in a smaller mesh, and less draw calls.
+        visible_blocks.iter().for_each(|block| {
+            let block_pos = block.position.to_ivec3();
+            let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
+            let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
+
+            let mut block_verticies = Vec::new();
+            let mut block_indicies = Vec::new();
+
+            // Front
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 0, 1))) {
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            // Back
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 0, -1))) {
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            // Left
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(-1, 0, 0))) {
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            // Right
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(1, 0, 0))) {
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            // Top
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 1, 0))) {
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            // Bottom
+            if !self.blocks.contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, -1, 0))) {
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
+                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
+                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
+
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 1);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32);
+                block_indicies.push(verticies.len() as u32 + 2);
+                block_indicies.push(verticies.len() as u32 + 3);
+            }
+
+            verticies.extend(block_verticies);
+            indicies.extend(block_indicies);
+        });
+
+        self.mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verticies);
+        self.mesh.set_indices(Some(Indices::U32(indicies)));
+    }
+}
+// ---------------------------
+
+// ---------- World ----------
+#[derive(Resource)]
+pub struct Map {
+    chunks: HashMap<IVec2, Chunk>,
+    cache: HashMap<IVec2, Chunk>,
+    noise: NoiseMap,
+}
+
+impl FromWorld for Map {
+    fn from_world(_world: &mut World) -> Self {
         let fbm = Fbm::<Perlin>::new(SEED);
 
         let height_map = PlaneMapBuilder::<_, 2>::new(&fbm)
-                .set_size(1024, 1024)
-                .set_x_bounds(-5.0, 5.0)
-                .set_y_bounds(-5.0, 5.0)
-                .build();
+        .set_size(1024, 1024)
+        .set_x_bounds(-5.0, 5.0)
+        .set_y_bounds(-5.0, 5.0)
+        .build();
 
-        let blocks = Arc::new(Mutex::new(HashSet::new()));
-
-        (0..CHUNK_SIZE).into_par_iter().for_each(|x| {
-            (0..CHUNK_SIZE).into_par_iter().for_each(|z| {
-                let noise = height_map.get_value(x as usize, z as usize);
-                let height = (noise * 10.0) as i32;
-        
-                for y in 0..height {
-                    let block = Block::new(IVec3::new(x, y, z));
-                    let mut blocks_guard = blocks.lock().unwrap();
-                    blocks_guard.insert(block);
-                }
-            });
-        });
-
-        let blocks = blocks.lock().unwrap();
-
-        Self {
-            blocks: blocks.clone(),
-            center_pos,
-            rendered: false,
+        Map {
+            chunks: HashMap::new(),
+            cache: HashMap::new(),
+            noise: height_map,
         }
     }
 }
+// ---------------------------
 
-impl ChunkManager {  
-    pub fn update(&mut self, camera_transform: &Transform) {
-        let camera_pos = camera_transform.translation;
-        let far_pos = camera_transform.forward() * CHUNK_SIZE as f32 * VIEW_DISTANCE as f32;
-        let end_pos = camera_pos + far_pos;
-        if let Some(block) = raycast(camera_pos, end_pos, self) {
-            println!("Block found at {:?}", block.position);
-            let chunk_pos = IVec2::new(block.position.x / CHUNK_SIZE, block.position.z / CHUNK_SIZE);
-            let chunk = Chunk::new(chunk_pos);
-            self.add_visible_chunk(&chunk);
-        }
-    }
-
-    fn add_visible_chunk(&mut self, chunk: &Chunk) {
-        if !self.visible_chunks.contains(&chunk) {
-            println!("Visible chunk added");
-            self.visible_chunks.insert(chunk.clone());
-            self.chunk_cache.insert(chunk.clone());
-        }
-    }
-
-    pub fn get_block(&self, pos: IVec3) -> Option<&Block> {
-        for chunk in self.visible_chunks.iter() {
-            for block in chunk.blocks.iter() {
-                if block.position == Position::from_ivec3(pos) {
-                    return Some(block);
-                }
+// ---------- Systems ----------
+pub fn initialize_world(mut commands: Commands, mut map: ResMut<Map>) {
+        // Generate four chunks.
+        for x in 0..2 {
+            for y in 0..2 {
+                let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
+                let mut chunk = Chunk::new(chunk_pos);
+                chunk.gen_blocks(&map.noise);
+                chunk.gen_mesh();
+                map.chunks.insert(chunk_pos, chunk.clone());
+                commands.spawn(chunk);
             }
         }
-        None
-    }
-
-    pub fn get_chunk(&self, pos: IVec2) -> Option<&Chunk> {
-        for chunk in self.visible_chunks.iter() {
-            if chunk.center_pos == pos {
-                return Some(chunk);
-            }
-        }
-        None
-    }
-
-    // Using the chunk data and the block positions, create the actual blocks on the screen
-    pub fn render_chunk(
-        &self,
-        commands: &mut Commands,
-        materials: &mut ResMut<Assets<StandardMaterial>>,
-        meshes: &mut ResMut<Assets<Mesh>>,
-        chunk: &Chunk,
-    ) {
-        if chunk.rendered {
-            return;
-        }
-
-        for block in chunk.blocks.iter() {
-            let block_pos = Vec3::new(
-                block.position.x as f32,
-                block.position.y as f32,
-                block.position.z as f32,
-            );
-            let block_transform = Transform::from_translation(block_pos);
-            commands
-                .spawn(PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-                    material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
-                    transform: block_transform,
-                    ..Default::default()
-                })
-                .insert(block.clone());
-        }
-
-        println!("Chunk rendered")
-    }
 }
-
-pub fn init_world(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut chunk_manager: ResMut<ChunkManager>,
-) {
-    // Generate the initial chunks
-    let mut chunk = Chunk::new(IVec2::new(0, 0));
-    chunk_manager.add_visible_chunk(&chunk);
-    chunk_manager.render_chunk(&mut commands, &mut materials, &mut meshes, &chunk);
-    println!("World initialized");
-}
-
-pub fn update_world(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut chunk_manager: ResMut<ChunkManager>,
-    camera: Query<&Transform, With<Camera3d>>,
-) {
-    // Get camera position
-    let transform = camera.single();
-
-    // Update the chunk data
-    chunk_manager.update(transform);
-    chunk_manager.visible_chunks.iter().for_each(|chunk| {
-        chunk_manager.render_chunk(&mut commands, &mut materials, &mut meshes, chunk);
-    });
-    // println!("World updated");
-}
-
-fn raycast(
-    start: Vec3,
-    end: Vec3,
-    chunk_manager: &ChunkManager,
-) -> Option<Block> {
-    let direction = (end - start).normalize();
-    let mut current_pos = start;
-    let mut distance = 0.0;
-    loop {
-        let block_pos = IVec3::new(
-            current_pos.x as i32,
-            current_pos.y as i32,
-            current_pos.z as i32,
-        );
-        let block = Block::new(block_pos);
-        if chunk_manager.get_block(block_pos).is_some() {
-            return Some(block);
-        }
-        current_pos += direction;
-        distance += 1.0;
-        if distance > CHUNK_SIZE as f32 {
-            break;
-        }
-    }
-    None
-}
-
-/*
-Thoughts:
-
-Generate a single mesh for each chunk, rather than individual blocks.
-
-Get one mesh working well again, then try to get multiple chunks working.
-
-Read about greedy meshing and culling.
-*/
+// -----------------------------

@@ -39,9 +39,9 @@ fn main() {
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
 		.add_plugin(FlyCameraPlugin)
-		.init_resource::<ChunkManager>()
+		.init_resource::<Map>()
         .add_startup_system(init)
-        .add_startup_system(init_world)
-		.add_system(update_world)
+        .add_startup_system(initialize_world)
+		// .add_system(update_world)
         .run();
 }

@@ -1,236 +1,255 @@
-use bevy::prelude::*;
+use std::hash::{Hash, Hasher};
+use fxhash::FxHasher;
+use std::sync::{Mutex, Arc};
+use bevy::{prelude::*, transform};
 use bevy::utils::HashSet;
-use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
-use noise::{Fbm, Perlin};
+use noise::{Perlin, Fbm};
+use noise::utils::{NoiseMapBuilder, PlaneMapBuilder};
+use rayon::prelude::*;
 
 const CHUNK_SIZE: i32 = 16;
-const VIEW_DISTANCE: i32 = CHUNK_SIZE * 4;
-const GENERATION_RADIUS: i32 = 4;
-const BUFFER_ZONE: i32 = 8;
+const VIEW_DISTANCE: i32 = 2;
+const GENERATION_RADIUS: i32 = 2;
+const SEED : u32 = 69;
 
-#[derive(Component)]
-pub struct Chunks {
-    chunks: Vec<Chunk>,
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+struct Position {
+    x: i32,
+    y: i32,
+    z: i32,
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum BlockType {
-    Grass,
-    Dirt,
-    Stone,
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Block {
+    position: Position,
 }
 
-#[derive(Bundle, Clone)]
-struct Block {
-    block_type: BlockType,
-    object: PbrBundle,
-}
-
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct Chunk {
-    blocks: Vec<Block>,
-    height_map: NoiseMap,
+    blocks: HashSet<Block>,
     center_pos: IVec2,
-}
-
-impl Chunk {
-    pub fn new(
-        center_pos: IVec2,
-        meshes: &mut ResMut<Assets<Mesh>>,
-        materials: &mut ResMut<Assets<StandardMaterial>>,
-    ) -> Self {
-        let mut blocks = Vec::new();
-
-        let fbm = Fbm::<Perlin>::new(rand::random());
-
-        let height_map = PlaneMapBuilder::<_, 2>::new(&fbm)
-            .set_size(1024, 1024)
-            .set_x_bounds(-5.0, 5.0)
-            .set_y_bounds(-5.0, 5.0)
-            .build();
-
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                let noise = height_map.get_value(x as usize, z as usize);
-                let height = (noise * 10.0) as i32;
-                for y in 0..height {
-                    if y == height - 1 {
-                        let block =
-                            Block::new(BlockType::Grass, IVec3::new(x, y, z), meshes, materials);
-                        blocks.push(block);
-                    } else if y > height - 5 {
-                        let block =
-                            Block::new(BlockType::Dirt, IVec3::new(x, y, z), meshes, materials);
-                        blocks.push(block);
-                    } else {
-                        let block =
-                            Block::new(BlockType::Stone, IVec3::new(x, y, z), meshes, materials);
-                        blocks.push(block);
-                    }
-                }
-            }
-        }
-        Self {
-            blocks,
-            height_map,
-            center_pos,
-        }
-    }
-
-    fn get_visible_blocks(&self, camera_pos: IVec3, view_distance: i32) -> Vec<Block> {
-        let mut visible_blocks = Vec::new();
-
-        for block in &self.blocks {
-            if (block.object.transform.translation.x - camera_pos.x as f32).abs()
-                < view_distance as f32
-                && (block.object.transform.translation.y - camera_pos.y as f32).abs()
-                    < view_distance as f32
-                && (block.object.transform.translation.z - camera_pos.z as f32).abs()
-                    < view_distance as f32
-            {
-                let new_block = block.clone();
-                visible_blocks.push(new_block);
-            }
-        }
-
-        visible_blocks
-    }
+    rendered: bool,
 }
 
 #[derive(Resource, Default)]
 pub struct ChunkManager {
-    player_position: Vec3,
-    generation_radius: i32,
-    buffer_zone: i32,
-    loaded_chunks: HashSet<IVec2>,
+    visible_chunks: HashSet<Chunk>,
+    chunk_cache: HashSet<Chunk>,
 }
 
-impl ChunkManager {
-    pub fn new(player_position: Vec3, generation_radius: i32, buffer_zone: i32) -> Self {
-        Self {
-            player_position,
-            generation_radius,
-            buffer_zone,
-            loaded_chunks: HashSet::new(),
-        }
+impl Position {
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
     }
 
-    pub fn update(&mut self, player_position: Vec3) {
-        let player_chunk = IVec2::new(
-            player_position.x.floor() as i32 / CHUNK_SIZE as i32,
-            player_position.z.floor() as i32 / CHUNK_SIZE as i32,
-        );
-
-        for x in player_chunk.x - self.generation_radius..player_chunk.x + self.generation_radius {
-            for z in
-                player_chunk.y - self.generation_radius..player_chunk.y + self.generation_radius
-            {
-                let chunk_pos = IVec2::new(x, z);
-                if !self.loaded_chunks.contains(&chunk_pos) {
-                    // Generate new chunk
-                    self.loaded_chunks.insert(chunk_pos);
-                }
-            }
-        }
-
-        let mut chunks_to_remove = Vec::new();
-        for chunk_pos in self.loaded_chunks.iter() {
-            let dist = ((chunk_pos.x - player_chunk.x).pow(2)
-                + (chunk_pos.y - player_chunk.y).pow(2)) as f32;
-            if dist > (self.generation_radius + self.buffer_zone).pow(2) as f32 {
-                // Chunk is outside buffer zone, remove it
-                chunks_to_remove.push(*chunk_pos);
-            }
-        }
-
-        for chunk_pos in chunks_to_remove {
-            self.loaded_chunks.remove(&chunk_pos);
-            // Delete chunk
+    fn from_ivec3(pos: IVec3) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
         }
     }
 }
 
 impl Block {
-    pub fn new(
-        block_type: BlockType,
-        coordinates: IVec3,
-        meshes: &mut ResMut<Assets<Mesh>>,
-        materials: &mut ResMut<Assets<StandardMaterial>>,
-    ) -> Self {
-        match block_type {
-            BlockType::Grass => Self {
-                block_type: BlockType::Grass,
-                object: PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-                    material: materials.add(Color::rgb(0.1, 0.53, 0.0).into()),
-                    transform: Transform::from_translation(coordinates.as_vec3()),
-                    ..Default::default()
-                },
-            },
-            BlockType::Dirt => Self {
-                block_type: BlockType::Dirt,
-                object: PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-                    material: materials.add(Color::rgb(1.0, 0.87, 0.71).into()),
-                    transform: Transform::from_translation(coordinates.as_vec3()),
-                    ..Default::default()
-                },
-            },
-            _ => Self {
-                block_type: BlockType::Stone,
-                object: PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-                    material: materials.add(Color::rgb(0.29, 0.36, 0.36).into()),
-                    transform: Transform::from_translation(coordinates.as_vec3()),
-                    ..Default::default()
-                },
-            },
+    fn new(position: IVec3) -> Self {
+        Self {
+            position: Position::new(position.x, position.y, position.z),
         }
+    }
+}
+
+impl Hash for Chunk {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
+        let mut hasher = FxHasher::default();
+        self.center_pos.hash(&mut hasher);
+        hasher.finish();
+    }
+}
+
+impl PartialEq for Chunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.center_pos == other.center_pos
+    }
+}
+
+impl Eq for Chunk {}
+
+impl Chunk {
+    pub fn new(
+        center_pos: IVec2,
+    ) -> Self {
+        let fbm = Fbm::<Perlin>::new(SEED);
+
+        let height_map = PlaneMapBuilder::<_, 2>::new(&fbm)
+                .set_size(1024, 1024)
+                .set_x_bounds(-5.0, 5.0)
+                .set_y_bounds(-5.0, 5.0)
+                .build();
+
+        let blocks = Arc::new(Mutex::new(HashSet::new()));
+
+        (0..CHUNK_SIZE).into_par_iter().for_each(|x| {
+            (0..CHUNK_SIZE).into_par_iter().for_each(|z| {
+                let noise = height_map.get_value(x as usize, z as usize);
+                let height = (noise * 10.0) as i32;
+        
+                for y in 0..height {
+                    let block = Block::new(IVec3::new(x, y, z));
+                    let mut blocks_guard = blocks.lock().unwrap();
+                    blocks_guard.insert(block);
+                }
+            });
+        });
+
+        let blocks = blocks.lock().unwrap();
+
+        Self {
+            blocks: blocks.clone(),
+            center_pos,
+            rendered: false,
+        }
+    }
+}
+
+impl ChunkManager {  
+    pub fn update(&mut self, camera_transform: &Transform) {
+        let camera_pos = camera_transform.translation;
+        let far_pos = camera_transform.forward() * CHUNK_SIZE as f32 * VIEW_DISTANCE as f32;
+        let end_pos = camera_pos + far_pos;
+        if let Some(block) = raycast(camera_pos, end_pos, self) {
+            println!("Block found at {:?}", block.position);
+            let chunk_pos = IVec2::new(block.position.x / CHUNK_SIZE, block.position.z / CHUNK_SIZE);
+            let chunk = Chunk::new(chunk_pos);
+            self.add_visible_chunk(&chunk);
+        }
+    }
+
+    fn add_visible_chunk(&mut self, chunk: &Chunk) {
+        if !self.visible_chunks.contains(&chunk) {
+            println!("Visible chunk added");
+            self.visible_chunks.insert(chunk.clone());
+            self.chunk_cache.insert(chunk.clone());
+        }
+    }
+
+    pub fn get_block(&self, pos: IVec3) -> Option<&Block> {
+        for chunk in self.visible_chunks.iter() {
+            for block in chunk.blocks.iter() {
+                if block.position == Position::from_ivec3(pos) {
+                    return Some(block);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_chunk(&self, pos: IVec2) -> Option<&Chunk> {
+        for chunk in self.visible_chunks.iter() {
+            if chunk.center_pos == pos {
+                return Some(chunk);
+            }
+        }
+        None
+    }
+
+    // Using the chunk data and the block positions, create the actual blocks on the screen
+    pub fn render_chunk(
+        &self,
+        commands: &mut Commands,
+        materials: &mut ResMut<Assets<StandardMaterial>>,
+        meshes: &mut ResMut<Assets<Mesh>>,
+        chunk: &Chunk,
+    ) {
+        if chunk.rendered {
+            return;
+        }
+
+        for block in chunk.blocks.iter() {
+            let block_pos = Vec3::new(
+                block.position.x as f32,
+                block.position.y as f32,
+                block.position.z as f32,
+            );
+            let block_transform = Transform::from_translation(block_pos);
+            commands
+                .spawn(PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+                    material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
+                    transform: block_transform,
+                    ..Default::default()
+                })
+                .insert(block.clone());
+        }
+
+        println!("Chunk rendered")
     }
 }
 
 pub fn init_world(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut chunk_manager: ResMut<ChunkManager>,
 ) {
-    for x in 0..4 {
-        for z in 0..4 {
-            let chunk = Chunk::new(IVec2::new(x, z), &mut meshes, &mut materials);
-            chunk_manager.loaded_chunks.insert(IVec2::new(x, z));
+    // Generate the initial chunks
+    let mut chunk = Chunk::new(IVec2::new(0, 0));
+    chunk_manager.add_visible_chunk(&chunk);
+    chunk_manager.render_chunk(&mut commands, &mut materials, &mut meshes, &chunk);
+    println!("World initialized");
+}
+
+pub fn update_world(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut chunk_manager: ResMut<ChunkManager>,
+    camera: Query<&Transform, With<Camera3d>>,
+) {
+    // Get camera position
+    let transform = camera.single();
+
+    // Update the chunk data
+    chunk_manager.update(transform);
+    chunk_manager.visible_chunks.iter().for_each(|chunk| {
+        chunk_manager.render_chunk(&mut commands, &mut materials, &mut meshes, chunk);
+    });
+    // println!("World updated");
+}
+
+fn raycast(
+    start: Vec3,
+    end: Vec3,
+    chunk_manager: &ChunkManager,
+) -> Option<Block> {
+    let direction = (end - start).normalize();
+    let mut current_pos = start;
+    let mut distance = 0.0;
+    loop {
+        let block_pos = IVec3::new(
+            current_pos.x as i32,
+            current_pos.y as i32,
+            current_pos.z as i32,
+        );
+        let block = Block::new(block_pos);
+        if chunk_manager.get_block(block_pos).is_some() {
+            return Some(block);
+        }
+        current_pos += direction;
+        distance += 1.0;
+        if distance > CHUNK_SIZE as f32 {
+            break;
         }
     }
+    None
 }
 
-pub fn chunk_generation(
-    mut commands: Commands,
-    mut chunk_manager: ResMut<ChunkManager>,
-    player: Query<&Transform, With<Camera>>,
-    query: Query<&Chunk>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mut pos = IVec3::new(0, 0, 0);
+/*
+Thoughts:
 
-    for player_transform in player.iter() {
-        pos = IVec3::new(
-            player_transform.translation.x.floor() as i32,
-            player_transform.translation.y.floor() as i32,
-            player_transform.translation.z.floor() as i32,
-        );
-    }
+Generate a single mesh for each chunk, rather than individual blocks.
 
-    chunk_manager.update(pos.as_vec3());
+Get one mesh working well again, then try to get multiple chunks working.
 
-    let mut visible_blocks = Vec::new();
-
-    // Generate the chunks in the chunk manager
-    for chunk in chunk_manager.loaded_chunks.iter() {
-        let chunk = Chunk::new(*chunk, &mut meshes, &mut materials);
-        let visible = chunk.get_visible_blocks(pos, VIEW_DISTANCE);
-        visible_blocks.extend(visible);
-    }
-
-    commands.spawn_batch(visible_blocks);
-}
+Read about greedy meshing and culling.
+*/
