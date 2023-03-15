@@ -257,9 +257,8 @@ pub fn initialize_world(mut commands: Commands, mut map: ResMut<Map>) {
     }
 
     // Find the total blocks generated.
-    let mut total_blocks = 0;
-    map.chunks.iter().for_each(|(_, chunk)| {
-        total_blocks += chunk.blocks.len();
+    let total_blocks = map.chunks.iter().fold(0, |acc, (_, chunk)| {
+        acc + chunk.blocks.len()
     });
 
     println!("Total blocks: {}", total_blocks);
