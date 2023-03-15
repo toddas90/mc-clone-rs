@@ -28,7 +28,7 @@ impl Block {
 #[derive(Component, Clone)]
 pub struct Chunk {
     blocks: HashSet<Block>,
-    mesh: Mesh,
+    mesh: Handle<Mesh>,
     start_pos: IVec2,
 }
 
@@ -36,7 +36,7 @@ impl Chunk {
     fn new(start_pos: IVec2) -> Self {
         Self {
             blocks: HashSet::new(),
-            mesh: Mesh::new(PrimitiveTopology::TriangleList),
+            mesh: Default::default(),
             start_pos,
         }
     }
@@ -56,7 +56,8 @@ impl Chunk {
         }
     }
 
-    fn gen_mesh(&mut self) {
+    fn gen_mesh(&mut self) -> Mesh {
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         let mut verticies = Vec::new();
         let mut indicies = Vec::new();
 
@@ -208,9 +209,13 @@ impl Chunk {
             indicies.extend(block_indicies);
         });
 
-        self.mesh
-            .insert_attribute(Mesh::ATTRIBUTE_POSITION, verticies);
-        self.mesh.set_indices(Some(Indices::U32(indicies)));
+        // self.mesh
+        //     .insert_attribute(Mesh::ATTRIBUTE_POSITION, verticies);
+        // self.mesh.set_indices(Some(Indices::U32(indicies)));
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verticies);
+        mesh.set_indices(Some(Indices::U32(indicies)));
+
+        mesh
     }
 }
 // ---------------------------
@@ -243,23 +248,45 @@ impl FromWorld for Map {
 // ---------------------------
 
 // ---------- Systems ----------
-pub fn initialize_world(mut commands: Commands, mut map: ResMut<Map>) {
+pub fn initialize_world(
+    mut commands: Commands,
+    mut map: ResMut<Map>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     // Generate four chunks.
     for x in 0..4 {
         for y in 0..4 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
             let mut chunk = Chunk::new(chunk_pos);
             chunk.gen_blocks(&map.noise);
-            chunk.gen_mesh();
-            map.chunks.insert(chunk_pos, chunk.clone());
-            commands.spawn(chunk);
+            chunk.mesh = meshes.add(chunk.gen_mesh());
+            map.chunks.insert(chunk_pos, chunk);
         }
     }
 
+    // Generate a single chunk.
+    // let chunk_pos = IVec2::new(0, 0);
+    // let mut chunk = Chunk::new(chunk_pos);
+    // chunk.gen_blocks(&map.noise);
+    // chunk.mesh = meshes.add(chunk.gen_mesh());
+    // map.chunks.insert(chunk_pos, chunk);
+
+    // Add the chunk to the world.
+    for (chunk_pos, chunk) in map.chunks.iter() {
+        commands.spawn(PbrBundle {
+            mesh: chunk.mesh.clone(),
+            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+            transform: Transform::from_translation(chunk_pos.as_vec2().extend(0.0)),
+            ..Default::default()
+        });
+    }
+
     // Find the total blocks generated.
-    let total_blocks = map.chunks.iter().fold(0, |acc, (_, chunk)| {
-        acc + chunk.blocks.len()
-    });
+    let total_blocks = map
+        .chunks
+        .iter()
+        .fold(0, |acc, (_, chunk)| acc + chunk.blocks.len());
 
     println!("Total blocks: {}", total_blocks);
 }
