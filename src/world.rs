@@ -213,7 +213,6 @@ pub fn update_world(
     chunk_manager.update(transform);
     chunk_manager.visible_chunks.iter().for_each(|chunk| {
         chunk_manager.render_chunk(&mut commands, &mut materials, &mut meshes, chunk);
-        chunk.rendered = true;
     });
     // println!("World updated");
 }
@@ -245,3 +244,12 @@ fn raycast(
     None
 }
 
+/*
+Thoughts:
+
+Generate a single mesh for each chunk, rather than individual blocks.
+
+Get one mesh working well again, then try to get multiple chunks working.
+
+Read about greedy meshing and culling.
+*/
