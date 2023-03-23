@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
+use noise::permutationtable::PermutationTable;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
@@ -46,14 +47,30 @@ impl Chunk {
         }
     }
 
+    // fn gen_blocks(&mut self, noise: &NoiseMap) {
+    //     for x in 0..CHUNK_SIZE {
+    //         for z in 0..CHUNK_SIZE {
+    //             let height = noise.get_value(x as usize, z as usize) * 10.0;
+    //             for y in -2..height as i32 {
+    //                 let block_pos = IVec3::new(x, y, z);
+    //                 let block = Block::new(block_pos);
+    //                 self.blocks.insert(block);
+    //             }
+    //         }
+    //     }
+    // }
+
     fn gen_blocks(&mut self, noise: &NoiseMap) {
+        // Using the 3d perlin noise, generate a 3d map of blocks
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
-                let height = noise.get_value(x as usize, z as usize) * 10.0;
-                for y in -2..height as i32 {
-                    let block_pos = IVec3::new(x, y, z);
-                    let block = Block::new(block_pos);
-                    self.blocks.insert(block);
+                for y in 0..CHUNK_SIZE {
+                    let height = noise.get_value(x as usize, z as usize) * 10.0;
+                    if (y as f64) < height {
+                        let block_pos = IVec3::new(x, y, z);
+                        let block = Block::new(block_pos);
+                        self.blocks.insert(block);
+                    }
                 }
             }
         }
@@ -170,7 +187,7 @@ impl FromWorld for Map {
     fn from_world(_world: &mut World) -> Self {
         let fbm = Fbm::<Perlin>::new(SEED);
 
-        let height_map = PlaneMapBuilder::<_, 2>::new(&fbm)
+        let height_map = PlaneMapBuilder::<_, 3>::new(&fbm)
             .set_size(1024, 1024)
             .set_x_bounds(-5.0, 5.0)
             .set_y_bounds(-5.0, 5.0)
