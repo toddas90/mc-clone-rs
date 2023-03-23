@@ -47,19 +47,6 @@ impl Chunk {
         }
     }
 
-    // fn gen_blocks(&mut self, noise: &NoiseMap) {
-    //     for x in 0..CHUNK_SIZE {
-    //         for z in 0..CHUNK_SIZE {
-    //             let height = noise.get_value(x as usize, z as usize) * 10.0;
-    //             for y in -2..height as i32 {
-    //                 let block_pos = IVec3::new(x, y, z);
-    //                 let block = Block::new(block_pos);
-    //                 self.blocks.insert(block);
-    //             }
-    //         }
-    //     }
-    // }
-
     fn gen_blocks(&mut self, noise: &NoiseMap) {
         // Using the 3d perlin noise, generate a 3d map of blocks
         for x in 0..CHUNK_SIZE {
@@ -210,8 +197,8 @@ pub fn initialize_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Generate four chunks.
-    for x in 0..4 {
-        for y in 0..4 {
+    for x in 0..2 {
+        for y in 0..2 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
             println!("Generating chunk at {:?}", chunk_pos);
             let mut chunk = Chunk::new();
@@ -221,8 +208,17 @@ pub fn initialize_world(
         }
     }
 
-    // Add the chunk to the world.
-    for (_chunk_pos, chunk) in map.chunks.iter() {
+    // Single chunk
+    // let chunk_pos = IVec2::new(0 * CHUNK_SIZE, 0 * CHUNK_SIZE);
+    // println!("Generating chunk at {:?}", chunk_pos);
+    // let mut chunk = Chunk::new();
+    // chunk.gen_blocks(&map.noise);
+    // chunk.gen_meshes(&mut meshes);
+    // map.chunks.insert(chunk_pos, chunk);
+
+    // Add the chunks to the world.
+    for (chunk_pos, chunk) in map.chunks.iter() {
+        println!("Adding chunk to world at {:?}", chunk_pos);
         for block in chunk.blocks.iter() {
             commands
                 .spawn(PbrBundle {
