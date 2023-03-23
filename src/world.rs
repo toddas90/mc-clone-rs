@@ -10,7 +10,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 const CHUNK_SIZE: i32 = 16;
-const SEED: u32 = 69;
+const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
 // ---------- Block ----------
