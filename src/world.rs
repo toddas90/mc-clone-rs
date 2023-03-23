@@ -88,119 +88,57 @@ impl Chunk {
             let block_pos = block_pos + Vec3::new(0.5, 0.5, 0.5);
 
             let mut block_verticies = Vec::new();
-            let mut block_indicies = Vec::new();
+            let block_indicies = vec![
+                0, 1, 2, 2, 3, 0, // Front
+                4, 5, 6, 6, 7, 4, // Back
+                8, 9, 10, 10, 11, 8, // Left
+                12, 13, 14, 14, 15, 12, // Right
+                16, 17, 18, 18, 19, 16, // Top
+                20, 21, 22, 22, 23, 20, // Bottom
+            ];
 
             // Front
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 0, 1)))
-            {
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
 
             // Back
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 0, -1)))
-            {
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
 
             // Left
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(-1, 0, 0)))
-            {
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
 
             // Right
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(1, 0, 0)))
-            {
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
 
             // Top
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, 1, 0)))
-            {
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, 0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, 0.5, 0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y + 0.5, block_pos.z + 0.5));
 
             // Bottom
-            if !self
-                .blocks
-                .contains(&Block::new(block_pos.as_ivec3() + IVec3::new(0, -1, 0)))
-            {
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, -0.5));
-                block_verticies.push(block_pos + Vec3::new(0.5, -0.5, 0.5));
-                block_verticies.push(block_pos + Vec3::new(-0.5, -0.5, 0.5));
-
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 1);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32);
-                block_indicies.push(verticies.len() as u32 + 2);
-                block_indicies.push(verticies.len() as u32 + 3);
-            }
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z - 0.5));
+            block_verticies.push(Vec3::new(block_pos.x + 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
+            block_verticies.push(Vec3::new(block_pos.x - 0.5, block_pos.y - 0.5, block_pos.z + 0.5));
 
             verticies.extend(block_verticies);
             indicies.extend(block_indicies);
         });
+
+        println!("verticies: {}", verticies.len());
+        println!("indicies: {}", indicies.len());
 
         // self.mesh
         //     .insert_attribute(Mesh::ATTRIBUTE_POSITION, verticies);
@@ -248,29 +186,29 @@ pub fn initialize_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Generate four chunks.
-    for x in 0..4 {
-        for y in 0..4 {
-            let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            println!("Generating chunk at {:?}", chunk_pos);
-            let mut chunk = Chunk::new();
-            chunk.gen_blocks(&map.noise);
-            chunk.mesh = meshes.add(chunk.gen_mesh());
-            map.chunks.insert(chunk_pos, chunk);
-        }
-    }
+    // for x in 0..4 {
+    //     for y in 0..4 {
+    //         let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
+    //         println!("Generating chunk at {:?}", chunk_pos);
+    //         let mut chunk = Chunk::new();
+    //         chunk.gen_blocks(&map.noise);
+    //         chunk.mesh = meshes.add(chunk.gen_mesh());
+    //         map.chunks.insert(chunk_pos, chunk);
+    //     }
+    // }
 
     // Generate a single chunk.
-    // let chunk_pos = IVec2::new(0, 0);
-    // let mut chunk = Chunk::new(chunk_pos);
-    // chunk.gen_blocks(&map.noise);
-    // chunk.mesh = meshes.add(chunk.gen_mesh());
-    // map.chunks.insert(chunk_pos, chunk);
+    let chunk_pos = IVec2::new(0, 0);
+    let mut chunk = Chunk::new();
+    chunk.gen_blocks(&map.noise);
+    chunk.mesh = meshes.add(chunk.gen_mesh());
+    map.chunks.insert(chunk_pos, chunk);
 
     // Add the chunk to the world.
     for (chunk_pos, chunk) in map.chunks.iter() {
         commands.spawn(PbrBundle {
             mesh: chunk.mesh.clone(),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+            material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
             transform: Transform::from_translation(chunk_pos.as_vec2().extend(0.0)),
             ..Default::default()
         });
