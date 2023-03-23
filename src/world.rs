@@ -27,10 +27,6 @@ impl Block {
             mesh: Default::default(),
         }
     }
-
-    fn get_pos(&self) -> IVec3 {
-        self.position
-    }
 }
 // --------------------------
 
