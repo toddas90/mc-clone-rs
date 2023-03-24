@@ -27,9 +27,6 @@ fn init(mut commands: Commands) {
             rotation: Quat::from_rotation_x(-PI / 4.),
             ..default()
         },
-        // The default cascade config is designed to handle large scenes.
-        // As this example has a much smaller world, we can tighten the shadow
-        // bounds for better visual quality.
         cascade_shadow_config: CascadeShadowConfigBuilder {
             first_cascade_far_bound: 10.0,
             num_cascades: 4,
@@ -39,15 +36,7 @@ fn init(mut commands: Commands) {
         .into(),
         ..default()
     });
-    // commands.spawn(PointLightBundle {
-    //     point_light: PointLight {
-    //         intensity: 2500.0,
-    //         shadows_enabled: true,
-    //         ..default()
-    //     },
-    //     transform: Transform::from_xyz(10.0, 12.0, 10.0),
-    //     ..default()
-    // });
+
     commands.spawn(Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()

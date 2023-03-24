@@ -6,6 +6,7 @@ use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 14;
@@ -49,7 +50,9 @@ impl Chunk {
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for y in 0..CHUNK_SIZE {
-                    let height = noise.get_value(x as usize + offset.x as usize, z as usize + offset.z as usize) * 10.0;
+                    let height = noise.get_value(
+                        x as usize + offset.x as usize, 
+                        z as usize + offset.z as usize) * 10.0;
                     if (y as f64) < height {
                         let block_pos = IVec3::new(x, y, z) + offset;
                         let block = Block::new(block_pos);
@@ -68,22 +71,24 @@ impl Chunk {
                 let block_pos = block.position;
 
                 // Check if the block is surrounded by other blocks
-                // If it is, don't render it
                 self.blocks.par_iter().any(|other_block| {
                     let other_block_pos = other_block.position;
 
                     // Use the manhattan distance to check if the block is surrounded
-                    let distance = (block_pos.x - other_block_pos.x).abs() + (block_pos.y - other_block_pos.y).abs() + (block_pos.z - other_block_pos.z).abs();
+                    let distance = (
+                        block_pos.x - other_block_pos.x).abs() + 
+                        (block_pos.y - other_block_pos.y).abs() + 
+                        (block_pos.z - other_block_pos.z).abs();
                     distance > 1
                 })
             })
             .collect::<Vec<_>>();
 
-        let mut new_meshes = HashMap::new();
+        let mut new_meshes = Arc::new(Mutex::new(HashMap::new()));
 
         // For each visible block, get the verticies and indicies that are not back to back with other blocks.
         // This will result in a smaller mesh, and less draw calls.
-        visible_blocks.iter().for_each(|block| {
+        visible_blocks.par_iter().for_each(|block| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
             let block_pos = block.position;
@@ -142,17 +147,15 @@ impl Chunk {
             // so we just use the same value for all of them
             mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0., 1., 0.]; 24]);
             mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0., 0.]; 24]);
-
-            new_meshes.insert(block.position, mesh);
+            new_meshes.lock().unwrap().insert(block.position, mesh);
         });
 
-        // Remove the blocks from self.blocks that are in new_meshes
-        self.blocks.retain(|block| !new_meshes.contains_key(&block.position));
+        self.blocks.retain(|block| !new_meshes.lock().unwrap().contains_key(&block.position));
 
-        for (position, mesh) in new_meshes {
+        for (position, mesh) in new_meshes.lock().unwrap().iter() {
             self.blocks.insert(Block {
-                position,
-                mesh: meshes.add(mesh),
+                position: *position,
+                mesh: meshes.add(mesh.clone()),
             });
         }
     }
@@ -218,12 +221,12 @@ pub fn initialize_world(
         }
     }
 
-    // Find the total blocks generated.
-    let total_blocks = map
-        .chunks
-        .iter()
-        .fold(0, |acc, (_, chunk)| acc + chunk.blocks.len());
+    // // Find the total blocks generated.
+    // let total_blocks = map
+    //     .chunks
+    //     .iter()
+    //     .fold(0, |acc, (_, chunk)| acc + chunk.blocks.len());
 
-    println!("Total blocks: {}", total_blocks);
+    // println!("Total blocks: {}", total_blocks);
 }
 // -----------------------------
