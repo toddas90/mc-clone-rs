@@ -1,13 +1,11 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use noise::permutationtable::PermutationTable;
-use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
+use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use std::sync::Arc;
 
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 14;
@@ -34,23 +32,26 @@ impl Block {
 #[derive(Component, Clone)]
 pub struct Chunk {
     blocks: HashSet<Block>,
+    pos: IVec2,
 }
 
 impl Chunk {
-    fn new() -> Self {
+    fn new(pos: IVec2) -> Self {
         Self {
             blocks: HashSet::new(),
+            pos: pos,
         }
     }
 
     fn gen_blocks(&mut self, noise: &NoiseMap) {
+        let offset = IVec3::new(self.pos.x, 0, self.pos.y);
         // Using the 3d perlin noise, generate a 3d map of blocks
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for y in 0..CHUNK_SIZE {
-                    let height = noise.get_value(x as usize, z as usize) * 10.0;
+                    let height = noise.get_value(x as usize + offset.x as usize, z as usize + offset.z as usize) * 10.0;
                     if (y as f64) < height {
-                        let block_pos = IVec3::new(x, y, z);
+                        let block_pos = IVec3::new(x, y, z) + offset;
                         let block = Block::new(block_pos);
                         self.blocks.insert(block);
                     }
@@ -193,28 +194,19 @@ pub fn initialize_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Generate four chunks.
-    for x in 0..2 {
-        for y in 0..2 {
+    for x in 0..3 {
+        for y in 0..3 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
             println!("Generating chunk at {:?}", chunk_pos);
-            let mut chunk = Chunk::new();
+            let mut chunk = Chunk::new(chunk_pos);
             chunk.gen_blocks(&map.noise);
             chunk.gen_meshes(&mut meshes);
             map.chunks.insert(chunk_pos, chunk);
         }
     }
 
-    // Single chunk
-    // let chunk_pos = IVec2::new(0 * CHUNK_SIZE, 0 * CHUNK_SIZE);
-    // println!("Generating chunk at {:?}", chunk_pos);
-    // let mut chunk = Chunk::new();
-    // chunk.gen_blocks(&map.noise);
-    // chunk.gen_meshes(&mut meshes);
-    // map.chunks.insert(chunk_pos, chunk);
-
     // Add the chunks to the world.
-    for (chunk_pos, chunk) in map.chunks.iter() {
-        println!("Adding chunk to world at {:?}", chunk_pos);
+    for (_, chunk) in map.chunks.iter() {
         for block in chunk.blocks.iter() {
             commands
                 .spawn(PbrBundle {
