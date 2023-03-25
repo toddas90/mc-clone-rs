@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use noise::{Fbm, Perlin};
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
+use noise::{Fbm, Perlin};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -51,8 +51,9 @@ impl Chunk {
             for z in 0..CHUNK_SIZE {
                 for y in 0..CHUNK_SIZE {
                     let height = noise.get_value(
-                        x as usize + offset.x as usize, 
-                        z as usize + offset.z as usize) * 10.0;
+                        x as usize + offset.x as usize,
+                        z as usize + offset.z as usize,
+                    ) * 10.0;
                     if (y as f64) < height {
                         let block_pos = IVec3::new(x, y, z) + offset;
                         let block = Block::new(block_pos);
@@ -67,7 +68,7 @@ impl Chunk {
         let visible_blocks = self
             .blocks
             .par_iter()
-            .filter(| block| {
+            .filter(|block| {
                 let block_pos = block.position;
 
                 // Check if the block is surrounded by other blocks
@@ -75,16 +76,15 @@ impl Chunk {
                     let other_block_pos = other_block.position;
 
                     // Use the manhattan distance to check if the block is surrounded
-                    let distance = (
-                        block_pos.x - other_block_pos.x).abs() + 
-                        (block_pos.y - other_block_pos.y).abs() + 
-                        (block_pos.z - other_block_pos.z).abs();
+                    let distance = (block_pos.x - other_block_pos.x).abs()
+                        + (block_pos.y - other_block_pos.y).abs()
+                        + (block_pos.z - other_block_pos.z).abs();
                     distance > 1
                 })
             })
             .collect::<Vec<_>>();
 
-        let mut new_meshes = Arc::new(Mutex::new(HashMap::new()));
+        let new_meshes = Arc::new(Mutex::new(HashMap::new()));
 
         // For each visible block, get the verticies and indicies that are not back to back with other blocks.
         // This will result in a smaller mesh, and less draw calls.
@@ -102,55 +102,157 @@ impl Chunk {
                 5, 4, 6, 6, 4, 7, // Back
                 4, 0, 7, 7, 0, 3, // Left
                 3, 2, 7, 7, 2, 6, // Top
-                4, 5, 0, 0, 5, 1 // Bottom
+                4, 5, 0, 0, 5, 1, // Bottom
             ];
 
+            // Need to figure out an effective way to only render the faces that are visible
+
             // Front
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
 
             // Back
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
 
             // Left
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
 
             // Right
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
 
             // Top
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y + 1.0,
+                block_pos.z + 1.0,
+            ));
 
             // Bottom
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0));
-            block_verticies.push(Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
-            block_verticies.push(Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z - 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x + 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
+            block_verticies.push(Vec3::new(
+                block_pos.x - 1.0,
+                block_pos.y - 1.0,
+                block_pos.z + 1.0,
+            ));
 
-            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
-            mesh.set_indices(Some(Indices::U32(block_indicies)));
             // In this example, normals and UVs don't matter,
             // so we just use the same value for all of them
-            mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0., 1., 0.]; 24]);
-            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0., 0.]; 24]);
+            mesh.insert_attribute(
+                Mesh::ATTRIBUTE_NORMAL,
+                vec![[0., 1., 0.]; block_verticies.len()],
+            );
+            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0., 0.]; block_verticies.len()]);
+            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
+            mesh.set_indices(Some(Indices::U32(block_indicies)));
             new_meshes.lock().unwrap().insert(block.position, mesh);
         });
 
-        self.blocks.retain(|block| !new_meshes.lock().unwrap().contains_key(&block.position));
+        self.blocks
+            .retain(|block| !new_meshes.lock().unwrap().contains_key(&block.position));
 
         for (position, mesh) in new_meshes.lock().unwrap().iter() {
             self.blocks.insert(Block {
@@ -211,13 +313,12 @@ pub fn initialize_world(
     // Add the chunks to the world.
     for (_, chunk) in map.chunks.iter() {
         for block in chunk.blocks.iter() {
-            commands
-                .spawn(PbrBundle {
-                    mesh: block.mesh.clone(),
-                    material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                    transform: Transform::from_translation(block.position.as_vec3()),
-                    ..Default::default()
-                });
+            commands.spawn(PbrBundle {
+                mesh: block.mesh.clone(),
+                material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                transform: Transform::from_translation(block.position.as_vec3()),
+                ..Default::default()
+            });
         }
     }
 
