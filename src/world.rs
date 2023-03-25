@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
+use bevy_fly_camera::FlyCamera;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
@@ -11,10 +12,11 @@ use std::sync::{Arc, Mutex};
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+const RENDER_DISTANCE: i32 = 4; // In chunks
 
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
-struct Block {
+pub struct Block {
     position: IVec3,
     mesh: Handle<Mesh>,
 }
@@ -94,10 +96,6 @@ impl Chunk {
                 }
             })
             .collect::<Vec<_>>();
-
-        println!();
-        println!("Visible blocks: {}", visible_blocks.len());
-        println!("Total blocks: {}", self.blocks.len());
 
         let new_meshes = Arc::new(Mutex::new(HashMap::new()));
 
@@ -283,7 +281,7 @@ impl Chunk {
 #[derive(Resource)]
 pub struct Map {
     chunks: HashMap<IVec2, Chunk>,
-    // cache: HashMap<IVec2, Chunk>,
+    cache: HashMap<IVec2, Chunk>,
     noise: NoiseMap,
 }
 
@@ -299,7 +297,7 @@ impl FromWorld for Map {
 
         Map {
             chunks: HashMap::new(),
-            // cache: HashMap::new(),
+            cache: HashMap::new(),
             noise: height_map,
         }
     }
@@ -313,11 +311,11 @@ pub fn initialize_world(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Generate four chunks.
+    // Generate x*y chunks.
     for x in 0..3 {
         for y in 0..3 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            println!("Generating chunk at {:?}", chunk_pos);
+            // println!("Generating chunk at {:?}", chunk_pos);
             let mut chunk = Chunk::new(chunk_pos);
             chunk.gen_blocks(&map.noise);
             chunk.gen_meshes(&mut meshes);
@@ -336,13 +334,65 @@ pub fn initialize_world(
             });
         }
     }
+}
 
-    // // Find the total blocks generated.
-    // let total_blocks = map
-    //     .chunks
-    //     .iter()
-    //     .fold(0, |acc, (_, chunk)| acc + chunk.blocks.len());
+pub fn update_world(
+    mut commands: Commands,
+    mut map: ResMut<Map>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    camera: Query<&Transform, With<Camera3d>>,
+) {
+    // In here, I will use the camera's position to determine which chunks to load and unload.
+    let camera = camera.single();
+    let pos = Vec2::new(camera.translation.x, camera.translation.z);
 
-    // println!("Total blocks: {}", total_blocks);
+    let mut temp_cache = HashMap::new();
+
+    // If the chunk is outside of the render distance, unload it.
+    map.chunks.iter().for_each(|(chunk_pos, chunk)| {
+        if pos.x - chunk_pos.x as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+            || pos.y - chunk_pos.y as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+        {
+            temp_cache.insert(chunk_pos.clone(), chunk.clone());
+        }
+    });
+
+    // Unload the chunks.
+    map.chunks
+        .retain(|chunk_pos, _| temp_cache.contains_key(chunk_pos) == false);
+
+    // Put the chunks into the cache.
+    map.cache.extend(temp_cache);
+
+    map.cache.iter().for_each(|(chunk_pos, chunk)| {
+        // Need to figure out how to despawn...
+        // commands.entity(chunk.blocks).despawn_recursive();
+    });
+
+    // Load chunks
+    // TODO
+
+    // Load the chunks.
+    // for x in -0..RENDER_DISTANCE {
+    //     for y in -0..RENDER_DISTANCE {
+    //         let chunk_pos = IVec2::new(
+    //             (pos.x + (x * CHUNK_SIZE) as f32) as i32,
+    //             (pos.y + (y * CHUNK_SIZE) as f32) as i32,
+    //         );
+
+    //         if map.chunks.contains_key(&chunk_pos) == false {
+    //             if map.cache.contains_key(&chunk_pos) {
+    //                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
+    //                 map.chunks.insert(chunk_pos, chunk);
+    //             } else {
+    //                 let mut chunk = Chunk::new(chunk_pos);
+    //                 chunk.gen_blocks(&map.noise);
+    //                 chunk.gen_meshes(&mut meshes);
+    //                 map.chunks.insert(chunk_pos, chunk);
+    //             }
+    //         }
+    //     }
+    // }
 }
 // -----------------------------

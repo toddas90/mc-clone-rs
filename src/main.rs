@@ -1,9 +1,10 @@
-use std::{sync::Arc, f32::consts::PI};
+use std::{f32::consts::PI, sync::Arc};
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
     prelude::*,
-    window::{WindowMode, WindowResolution}, pbr::{DirectionalLightShadowMap, CascadeShadowConfigBuilder},
+    window::{WindowMode, WindowResolution},
 };
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 
@@ -37,10 +38,12 @@ fn init(mut commands: Commands) {
         ..default()
     });
 
-    commands.spawn(Camera3dBundle {
+    commands
+        .spawn(Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
-        }).insert(FlyCamera::default());
+        })
+        .insert(FlyCamera::default());
 
     println!("Started Camera!");
 }
@@ -61,9 +64,9 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(FlyCameraPlugin)
         .init_resource::<Map>()
-        .insert_resource(DirectionalLightShadowMap { size: 2048 })
+        //.insert_resource(DirectionalLightShadowMap { size: 2048 })
         .add_startup_system(init)
         .add_startup_system(initialize_world)
-        // .add_system(update_world)
+        .add_system(update_world)
         .run();
 }
