@@ -70,19 +70,34 @@ impl Chunk {
             .par_iter()
             .filter(|block| {
                 let block_pos = block.position;
+                let other_blocks = &self.blocks;
 
-                // Check if the block is surrounded by other blocks
-                self.blocks.par_iter().any(|other_block| {
-                    let other_block_pos = other_block.position;
+                let surrounding = vec![
+                    Block::new(IVec3::new(block_pos.x - 1, block_pos.y, block_pos.z)),
+                    Block::new(IVec3::new(block_pos.x, block_pos.y - 1, block_pos.z)),
+                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z - 1)),
+                    Block::new(IVec3::new(block_pos.x + 1, block_pos.y, block_pos.z)),
+                    Block::new(IVec3::new(block_pos.x, block_pos.y + 1, block_pos.z)),
+                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z + 1)),
+                ];
 
-                    // Use the manhattan distance to check if the block is surrounded
-                    let distance = (block_pos.x - other_block_pos.x).abs()
-                        + (block_pos.y - other_block_pos.y).abs()
-                        + (block_pos.z - other_block_pos.z).abs();
-                    distance > 1
-                })
+                if other_blocks.contains(&surrounding[0])
+                    && other_blocks.contains(&surrounding[1])
+                    && other_blocks.contains(&surrounding[2])
+                    && other_blocks.contains(&surrounding[3])
+                    && other_blocks.contains(&surrounding[4])
+                    && other_blocks.contains(&surrounding[5])
+                {
+                    false
+                } else {
+                    true
+                }
             })
             .collect::<Vec<_>>();
+
+        println!();
+        println!("Visible blocks: {}", visible_blocks.len());
+        println!("Total blocks: {}", self.blocks.len());
 
         let new_meshes = Arc::new(Mutex::new(HashMap::new()));
 
