@@ -323,17 +323,36 @@ pub fn initialize_world(
         }
     }
 
-    // Add the chunks to the world.
     for (_, chunk) in map.chunks.iter() {
-        for block in chunk.blocks.iter() {
-            commands.spawn(PbrBundle {
-                mesh: block.mesh.clone(),
-                material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                transform: Transform::from_translation(block.position.as_vec3()),
-                ..Default::default()
-            });
-        }
+        commands
+            .spawn(Chunk {
+                blocks: chunk.blocks.clone(),
+                pos: chunk.pos,
+            })
+            .with_children(|parent| {
+                for block in chunk.blocks.iter() {
+                    parent.spawn(PbrBundle {
+                        mesh: block.mesh.clone(),
+                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                        transform: Transform::from_translation(block.position.as_vec3()),
+                        ..Default::default()
+                    });
+                }
+            })
+            .insert(VisibilityBundle::default());
     }
+
+    // // Add the chunks to the world.
+    // for (_, chunk) in map.chunks.iter() {
+    //     for block in chunk.blocks.iter() {
+    //         commands.spawn(PbrBundle {
+    //             mesh: block.mesh.clone(),
+    //             material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+    //             transform: Transform::from_translation(block.position.as_vec3()),
+    //             ..Default::default()
+    //         });
+    //     }
+    // }
 }
 
 pub fn update_world(
@@ -342,6 +361,7 @@ pub fn update_world(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera: Query<&Transform, With<Camera3d>>,
+    entities: Query<Entity, &Chunk>,
 ) {
     // In here, I will use the camera's position to determine which chunks to load and unload.
     let camera = camera.single();
@@ -365,10 +385,12 @@ pub fn update_world(
     // Put the chunks into the cache.
     map.cache.extend(temp_cache);
 
-    map.cache.iter().for_each(|(chunk_pos, chunk)| {
-        // Need to figure out how to despawn...
-        // commands.entity(chunk.blocks).despawn_recursive();
-    });
+    // Despawn the chunks.
+    for (entity, chunk) in entities.iter().zip(map.chunks.values()) {
+        if map.cache.contains_key(&chunk.pos) == false {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
 
     // Load chunks
     // TODO
@@ -394,5 +416,11 @@ pub fn update_world(
     //         }
     //     }
     // }
+}
+
+fn despawn_system<M: Component>(mut commands: Commands, query: Query<Entity, With<M>>) {
+    query.for_each(|entity| {
+        commands.entity(entity).despawn();
+    });
 }
 // -----------------------------

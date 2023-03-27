@@ -67,6 +67,6 @@ fn main() {
         //.insert_resource(DirectionalLightShadowMap { size: 2048 })
         .add_startup_system(init)
         .add_startup_system(initialize_world)
-        .add_system(update_world)
+        // .add_system(update_world)
         .run();
 }
