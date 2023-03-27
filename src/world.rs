@@ -317,25 +317,19 @@ pub fn initialize_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Generate x*y chunks.
-    for x in 0..3 {
-        for y in 0..3 {
+    for x in 0..4 {
+        for y in 0..4 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
             // println!("Generating chunk at {:?}", chunk_pos);
             let mut chunk = Chunk::new(chunk_pos);
             chunk.gen_blocks(&map.noise);
             chunk.gen_meshes(&mut meshes);
-            map.chunks.insert(chunk_pos, chunk);
-        }
-    }
 
-    // Add some chunks to the cache
-    for x in 0..3 {
-        for y in 0..3 {
-            let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            let mut chunk = Chunk::new(chunk_pos);
-            chunk.gen_blocks(&map.noise);
-            chunk.gen_meshes(&mut meshes);
-            map.cache.insert(chunk_pos, chunk);
+            if x == 4 || y == 4 {
+                map.cache.insert(chunk_pos, chunk);
+            } else {
+                map.chunks.insert(chunk_pos, chunk);
+            }
         }
     }
 
