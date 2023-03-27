@@ -323,6 +323,17 @@ pub fn initialize_world(
         }
     }
 
+    // Add some chunks to the cache
+    for x in 0..3 {
+        for y in 0..3 {
+            let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
+            let mut chunk = Chunk::new(chunk_pos);
+            chunk.gen_blocks(&map.noise);
+            chunk.gen_meshes(&mut meshes);
+            map.cache.insert(chunk_pos, chunk);
+        }
+    }
+
     spawn_chunks(commands, &map, meshes, materials);
 
     // // Add the chunks to the world.
@@ -379,15 +390,17 @@ pub fn update_world(
     // Load the chunks.
     if map.chunks.len() < 9 {
         let chunk_pos = IVec2::new(
-            (pos.x + (pos.x * CHUNK_SIZE as f32) as f32) as i32,
-            (pos.y + (pos.y * CHUNK_SIZE as f32) as f32) as i32,
+            (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
+            (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
         );
 
         if map.chunks.contains_key(&chunk_pos) == false {
             if map.cache.contains_key(&chunk_pos) {
+                println!("Loading chunk at {:?} from cache", chunk_pos);
                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
                 map.chunks.insert(chunk_pos, chunk);
             } else {
+                println!("Generating chunk at {:?}", chunk_pos);
                 let mut chunk = Chunk::new(chunk_pos);
                 chunk.gen_blocks(&map.noise);
                 chunk.gen_meshes(&mut meshes);
@@ -397,8 +410,11 @@ pub fn update_world(
         spawn_chunks(commands, &map, meshes, materials);
     }
 
-    println!("Loaded Chunks: {}", map.chunks.len());
-    println!("Cached Chunks: {}", map.cache.len());
+    // println!(
+    //     "Loaded Chunks: {} <-> Cached Chunks: {}",
+    //     map.chunks.len(),
+    //     map.cache.len()
+    // );
 }
 
 fn spawn_chunks(
