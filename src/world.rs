@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy_flycam::FlyCam;
+use ndarray::Array3;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
@@ -20,7 +21,7 @@ const RENDER_DISTANCE: i32 = 4; // In chunks
 */
 
 // ---------- Block ----------
-#[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Component, Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Block {
     position: IVec3,
     mesh: Handle<Mesh>,
@@ -39,15 +40,19 @@ impl Block {
 // ---------- Chunk ----------
 #[derive(Component, Clone)]
 pub struct Chunk {
-    blocks: HashSet<Block>,
+    blocks: Array3<Option<Block>>,
     pos: IVec2,
 }
 
 impl Chunk {
     fn new(pos: IVec2) -> Self {
         Self {
-            blocks: HashSet::new(),
-            pos: pos,
+            blocks: Array3::default((
+                CHUNK_SIZE as usize,
+                CHUNK_SIZE as usize,
+                CHUNK_SIZE as usize,
+            )),
+            pos,
         }
     }
 
@@ -64,7 +69,7 @@ impl Chunk {
                     if (y as f64) < height {
                         let block_pos = IVec3::new(x, y, z) + offset;
                         let block = Block::new(block_pos);
-                        self.blocks.insert(block);
+                        self.blocks[[x as usize, y as usize, z as usize]] = Some(block);
                     }
                 }
             }
@@ -74,30 +79,51 @@ impl Chunk {
     fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
         let visible_blocks = self
             .blocks
-            .par_iter()
-            .filter(|block| {
-                let block_pos = block.position;
-                let other_blocks = &self.blocks;
+            .iter()
+            .filter({
+                |block| {
+                    // if the block is none, it is not visible.
+                    if block.is_none() {
+                        return false;
+                    }
 
-                let surrounding = vec![
-                    Block::new(IVec3::new(block_pos.x - 1, block_pos.y, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y - 1, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z - 1)),
-                    Block::new(IVec3::new(block_pos.x + 1, block_pos.y, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y + 1, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z + 1)),
-                ];
+                    // If the block is surrounded on all sides by Some, it is not visible.
+                    let block = block.as_ref().unwrap();
+                    let block_pos = block.position;
+                    let block_pos =
+                        Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
+                    let block_pos = block_pos + BLOCK_SIZE;
 
-                if other_blocks.contains(&surrounding[0])
-                    && other_blocks.contains(&surrounding[1])
-                    && other_blocks.contains(&surrounding[2])
-                    && other_blocks.contains(&surrounding[3])
-                    && other_blocks.contains(&surrounding[4])
-                    && other_blocks.contains(&surrounding[5])
-                {
-                    false
-                } else {
-                    true
+                    let mut visible = true;
+
+                    // Check if the block is surrounded on all sides by other blocks
+                    for x in -1..2 {
+                        for y in -1..2 {
+                            for z in -1..2 {
+                                let pos = Vec3::new(x as f32, y as f32, z as f32);
+                                let pos = block_pos + pos;
+                                let pos = IVec3::new(pos.x as i32, pos.y as i32, pos.z as i32);
+
+                                if pos.x < 0
+                                    || pos.y < 0
+                                    || pos.z < 0
+                                    || pos.x >= CHUNK_SIZE
+                                    || pos.y >= CHUNK_SIZE
+                                    || pos.z >= CHUNK_SIZE
+                                {
+                                    continue;
+                                }
+
+                                if self.blocks[[pos.x as usize, pos.y as usize, pos.z as usize]]
+                                    .is_none()
+                                {
+                                    visible = false;
+                                }
+                            }
+                        }
+                    }
+
+                    visible
                 }
             })
             .collect::<Vec<_>>();
@@ -109,7 +135,7 @@ impl Chunk {
         visible_blocks.par_iter().for_each(|block| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
-            let block_pos = block.position;
+            let block_pos = block.as_ref().unwrap().position;
             let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
             let block_pos = block_pos + BLOCK_SIZE;
 
@@ -266,14 +292,25 @@ impl Chunk {
             mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0., 0.]; block_verticies.len()]);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
-            new_meshes.lock().unwrap().insert(block.position, mesh);
+            new_meshes
+                .lock()
+                .unwrap()
+                .insert(block.as_ref().unwrap().position, mesh);
         });
 
-        self.blocks
-            .retain(|block| !new_meshes.lock().unwrap().contains_key(&block.position));
+        self.blocks.iter().filter(|block| {
+            !new_meshes
+                .lock()
+                .unwrap()
+                .contains_key(&block.as_ref().unwrap().position)
+        });
 
         for (position, mesh) in new_meshes.lock().unwrap().iter() {
-            self.blocks.insert(Block {
+            self.blocks[[
+                position.x as usize,
+                position.y as usize,
+                position.z as usize,
+            ]] = Some(Block {
                 position: *position,
                 mesh: meshes.add(mesh.clone()),
             });
@@ -348,9 +385,11 @@ pub fn initialize_world(
             .with_children(|parent| {
                 for block in chunk.blocks.iter() {
                     parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
+                        mesh: block.as_ref().unwrap().mesh.clone(),
                         material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                        transform: Transform::from_translation(block.position.as_vec3()),
+                        transform: Transform::from_translation(
+                            block.as_ref().unwrap().position.as_vec3(),
+                        ),
                         ..Default::default()
                     });
                 }
@@ -453,9 +492,11 @@ fn spawn_chunks(
             .with_children(|parent| {
                 for block in chunk.blocks.iter() {
                     parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
+                        mesh: block.as_ref().unwrap().mesh.clone(),
                         material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                        transform: Transform::from_translation(block.position.as_vec3()),
+                        transform: Transform::from_translation(
+                            block.as_ref().unwrap().position.as_vec3(),
+                        ),
                         ..Default::default()
                     });
                 }
