@@ -323,24 +323,7 @@ pub fn initialize_world(
         }
     }
 
-    for (_, chunk) in map.chunks.iter() {
-        commands
-            .spawn(Chunk {
-                blocks: chunk.blocks.clone(),
-                pos: chunk.pos,
-            })
-            .with_children(|parent| {
-                for block in chunk.blocks.iter() {
-                    parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
-                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                        transform: Transform::from_translation(block.position.as_vec3()),
-                        ..Default::default()
-                    });
-                }
-            })
-            .insert(VisibilityBundle::default());
-    }
+    spawn_chunks(commands, &map, meshes, materials);
 
     // // Add the chunks to the world.
     // for (_, chunk) in map.chunks.iter() {
@@ -392,35 +375,55 @@ pub fn update_world(
             commands.entity(entity).despawn_recursive();
         }
     }
-    // for (entity, chunk) in entities.iter().zip(map.chunks.values()) {
-    //     if map.cache.contains_key(&chunk.pos) == true {
-    //         commands.entity(entity).despawn_recursive();
-    //     }
-    // }
-
-    // Load chunks
-    // TODO
 
     // Load the chunks.
-    // for x in -0..RENDER_DISTANCE {
-    //     for y in -0..RENDER_DISTANCE {
-    //         let chunk_pos = IVec2::new(
-    //             (pos.x + (x * CHUNK_SIZE) as f32) as i32,
-    //             (pos.y + (y * CHUNK_SIZE) as f32) as i32,
-    //         );
+    if map.chunks.len() < 9 {
+        let chunk_pos = IVec2::new(
+            (pos.x + (pos.x * CHUNK_SIZE as f32) as f32) as i32,
+            (pos.y + (pos.y * CHUNK_SIZE as f32) as f32) as i32,
+        );
 
-    //         if map.chunks.contains_key(&chunk_pos) == false {
-    //             if map.cache.contains_key(&chunk_pos) {
-    //                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
-    //                 map.chunks.insert(chunk_pos, chunk);
-    //             } else {
-    //                 let mut chunk = Chunk::new(chunk_pos);
-    //                 chunk.gen_blocks(&map.noise);
-    //                 chunk.gen_meshes(&mut meshes);
-    //                 map.chunks.insert(chunk_pos, chunk);
-    //             }
-    //         }
-    //     }
-    // }
+        if map.chunks.contains_key(&chunk_pos) == false {
+            if map.cache.contains_key(&chunk_pos) {
+                let chunk = map.cache.get(&chunk_pos).unwrap().clone();
+                map.chunks.insert(chunk_pos, chunk);
+            } else {
+                let mut chunk = Chunk::new(chunk_pos);
+                chunk.gen_blocks(&map.noise);
+                chunk.gen_meshes(&mut meshes);
+                map.chunks.insert(chunk_pos, chunk);
+            }
+        }
+        spawn_chunks(commands, &map, meshes, materials);
+    }
+
+    println!("Loaded Chunks: {}", map.chunks.len());
+    println!("Cached Chunks: {}", map.cache.len());
+}
+
+fn spawn_chunks(
+    mut commands: Commands,
+    map: &Map,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for (_, chunk) in map.chunks.iter() {
+        commands
+            .spawn(Chunk {
+                blocks: chunk.blocks.clone(),
+                pos: chunk.pos,
+            })
+            .with_children(|parent| {
+                for block in chunk.blocks.iter() {
+                    parent.spawn(PbrBundle {
+                        mesh: block.mesh.clone(),
+                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                        transform: Transform::from_translation(block.position.as_vec3()),
+                        ..Default::default()
+                    });
+                }
+            })
+            .insert(VisibilityBundle::default());
+    }
 }
 // -----------------------------
