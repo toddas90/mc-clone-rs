@@ -365,7 +365,7 @@ pub fn update_world(
     mut commands: Commands,
     mut map: ResMut<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    materials: ResMut<Assets<StandardMaterial>>,
     camera: Query<&Transform, With<FlyCam>>,
     entities: Query<(Entity, &Chunk), With<Chunk>>,
 ) {

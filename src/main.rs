@@ -11,12 +11,6 @@ use bevy_flycam::PlayerPlugin;
 mod world;
 use world::*;
 
-#[derive(Resource, Default)]
-struct Player {
-    position: Vec3,
-    camera: Camera3dBundle,
-}
-
 // This is a simple example of a camera that flies around.
 // There's an included example of a system that toggles the "enabled"
 // property of the fly camera with "T"
