@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use bevy_fly_camera::FlyCamera;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
@@ -334,19 +333,26 @@ pub fn initialize_world(
         }
     }
 
-    spawn_chunks(commands, &map, meshes, materials);
+    map.chunks.iter().for_each(|(_chunk_pos, chunk)| {
+        commands
+            .spawn(Chunk {
+                blocks: chunk.blocks.clone(),
+                pos: chunk.pos,
+            })
+            .with_children(|parent| {
+                for block in chunk.blocks.iter() {
+                    parent.spawn(PbrBundle {
+                        mesh: block.mesh.clone(),
+                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                        transform: Transform::from_translation(block.position.as_vec3()),
+                        ..Default::default()
+                    });
+                }
+            })
+            .insert(VisibilityBundle::default());
+    });
 
-    // // Add the chunks to the world.
-    // for (_, chunk) in map.chunks.iter() {
-    //     for block in chunk.blocks.iter() {
-    //         commands.spawn(PbrBundle {
-    //             mesh: block.mesh.clone(),
-    //             material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-    //             transform: Transform::from_translation(block.position.as_vec3()),
-    //             ..Default::default()
-    //         });
-    //     }
-    // }
+    spawn_chunks(commands, &map, materials);
 }
 
 pub fn update_world(
@@ -361,69 +367,78 @@ pub fn update_world(
     let camera = camera.single();
     let pos = Vec2::new(camera.translation.x, camera.translation.z);
 
-    let mut temp_cache = HashMap::new();
+    // let mut temp_cache = HashMap::new();
 
-    // If the chunk is outside of the render distance, unload it.
-    map.chunks.iter().for_each(|(chunk_pos, chunk)| {
-        if pos.x - chunk_pos.x as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
-            || pos.y - chunk_pos.y as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
-        {
-            temp_cache.insert(chunk_pos.clone(), chunk.clone());
-        }
-    });
+    // // If the chunk is outside of the render distance, unload it.
+    // map.chunks.iter().for_each(|(chunk_pos, chunk)| {
+    //     if pos.x - chunk_pos.x as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+    //         || pos.y - chunk_pos.y as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+    //     {
+    //         temp_cache.insert(chunk_pos.clone(), chunk.clone());
+    //     }
+    // });
 
-    // Unload the chunks.
-    map.chunks
-        .retain(|chunk_pos, _| temp_cache.contains_key(chunk_pos) == false);
+    // // Unload the chunks.
+    // map.chunks
+    //     .retain(|chunk_pos, _| temp_cache.contains_key(chunk_pos) == false);
 
-    // Put the chunks into the cache.
-    map.cache.extend(temp_cache);
+    // // Put the chunks into the cache.
+    // if map.cache.len() < 17 {
+    //     map.cache.extend(temp_cache);
+    // } else {
+    //     // Remove chunks from cache.
+    //     let mut temp_cache = temp_cache;
+    //     map.cache.retain(|chunk_pos, _| {
+    //         if temp_cache.contains_key(chunk_pos) {
+    //             temp_cache.remove(chunk_pos);
+    //             return false;
+    //         }
+    //         return true;
+    //     });
 
-    // Despawn the chunks.
-    for (entity, chunk) in entities.iter() {
-        if map.cache.contains_key(&chunk.pos) == true {
-            println!("Despawning chunk at {:?}", chunk.pos);
-            commands.entity(entity).despawn_recursive();
-        }
-    }
+    //     // Add the new chunks to the cache.
+    //     map.cache.extend(temp_cache);
+    // }
 
-    // Load the chunks.
-    if map.chunks.len() < 9 {
-        let chunk_pos = IVec2::new(
-            (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
-            (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
-        );
+    // // Despawn the chunks.
+    // for (entity, chunk) in entities.iter() {
+    //     if map.chunks.contains_key(&chunk.pos) == false {
+    //         println!("Despawning chunk at {:?}", chunk.pos);
+    //         commands.entity(entity).despawn_recursive();
+    //     }
+    // }
 
-        if map.chunks.contains_key(&chunk_pos) == false {
-            if map.cache.contains_key(&chunk_pos) {
-                println!("Loading chunk at {:?} from cache", chunk_pos);
-                let chunk = map.cache.get(&chunk_pos).unwrap().clone();
-                map.chunks.insert(chunk_pos, chunk);
-            } else {
-                println!("Generating chunk at {:?}", chunk_pos);
-                let mut chunk = Chunk::new(chunk_pos);
-                chunk.gen_blocks(&map.noise);
-                chunk.gen_meshes(&mut meshes);
-                map.chunks.insert(chunk_pos, chunk);
-            }
-        }
-        spawn_chunks(commands, &map, meshes, materials);
-    }
+    // // Load the chunks.
+    // if map.chunks.len() < 10 as usize {
+    //     let chunk_pos = IVec2::new(
+    //         (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
+    //         (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
+    //     );
 
-    // println!(
-    //     "Loaded Chunks: {} <-> Cached Chunks: {}",
-    //     map.chunks.len(),
-    //     map.cache.len()
-    // );
+    //     if map.chunks.contains_key(&chunk_pos) == false {
+    //         if map.cache.contains_key(&chunk_pos) {
+    //             println!("Loading chunk at {:?} from cache", chunk_pos);
+    //             let chunk = map.cache.get(&chunk_pos).unwrap().clone();
+    //             map.chunks.insert(chunk_pos, chunk);
+    //         } else {
+    //             println!("Generating chunk at {:?}", chunk_pos);
+    //             let mut chunk = Chunk::new(chunk_pos);
+    //             chunk.gen_blocks(&map.noise);
+    //             chunk.gen_meshes(&mut meshes);
+    //             map.chunks.insert(chunk_pos, chunk);
+    //         }
+    //         spawn_chunks(commands, &map, meshes, materials);
+    //     }
+    // }
 }
 
 fn spawn_chunks(
     mut commands: Commands,
     map: &Map,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (_, chunk) in map.chunks.iter() {
+    println!("Spawning chunks");
+    for chunk in map.chunks.values() {
         commands
             .spawn(Chunk {
                 blocks: chunk.blocks.clone(),

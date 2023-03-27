@@ -1,15 +1,21 @@
-use std::{f32::consts::PI, sync::Arc};
+use std::f32::consts::PI;
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    pbr::CascadeShadowConfigBuilder,
     prelude::*,
     window::{WindowMode, WindowResolution},
 };
-use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
+use bevy_flycam::PlayerPlugin;
 
 mod world;
 use world::*;
+
+#[derive(Resource, Default)]
+struct Player {
+    position: Vec3,
+    camera: Camera3dBundle,
+}
 
 // This is a simple example of a camera that flies around.
 // There's an included example of a system that toggles the "enabled"
@@ -37,15 +43,6 @@ fn init(mut commands: Commands) {
         .into(),
         ..default()
     });
-
-    commands
-        .spawn(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        })
-        .insert(FlyCamera::default());
-
-    println!("Started Camera!");
 }
 
 fn main() {
@@ -54,7 +51,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Minecraft".to_string(),
-                resolution: WindowResolution::new(1920.0, 1080.0),
+                resolution: WindowResolution::new(1280.0, 720.0),
                 mode: WindowMode::Windowed,
                 ..Default::default()
             }),
@@ -62,9 +59,8 @@ fn main() {
         }))
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(FlyCameraPlugin)
+        .add_plugin(PlayerPlugin)
         .init_resource::<Map>()
-        //.insert_resource(DirectionalLightShadowMap { size: 2048 })
         .add_startup_system(init)
         .add_startup_system(initialize_world)
         .add_system(update_world)
