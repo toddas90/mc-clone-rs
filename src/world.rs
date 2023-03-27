@@ -14,6 +14,11 @@ const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const RENDER_DISTANCE: i32 = 4; // In chunks
 
+// POSSIBLE IMPROVEMENTS
+/*
+    1. Use a HashMap insteqd of a HashSet for the blocks in a chunk. - Improve neighbor block checking
+*/
+
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Block {
