@@ -10,7 +10,7 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 const CHUNK_SIZE: i32 = 16;
-const SEED: u32 = 14;
+const SEED: u32 = 69420;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const RENDER_DISTANCE: i32 = 4; // In chunks
 
@@ -325,6 +325,7 @@ pub fn initialize_world(
             chunk.gen_blocks(&map.noise);
             chunk.gen_meshes(&mut meshes);
 
+            // I want 4x4 chunks loaded initially, with the outer layer being cached.
             if x == 4 || y == 4 {
                 map.cache.insert(chunk_pos, chunk);
             } else {
