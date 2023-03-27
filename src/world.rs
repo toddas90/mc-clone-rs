@@ -361,7 +361,7 @@ pub fn update_world(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera: Query<&Transform, With<Camera3d>>,
-    entities: Query<Entity, &Chunk>,
+    entities: Query<(Entity, &Chunk), With<Chunk>>,
 ) {
     // In here, I will use the camera's position to determine which chunks to load and unload.
     let camera = camera.single();
@@ -386,11 +386,17 @@ pub fn update_world(
     map.cache.extend(temp_cache);
 
     // Despawn the chunks.
-    for (entity, chunk) in entities.iter().zip(map.chunks.values()) {
-        if map.cache.contains_key(&chunk.pos) == false {
+    for (entity, chunk) in entities.iter() {
+        if map.cache.contains_key(&chunk.pos) == true {
+            println!("Despawning chunk at {:?}", chunk.pos);
             commands.entity(entity).despawn_recursive();
         }
     }
+    // for (entity, chunk) in entities.iter().zip(map.chunks.values()) {
+    //     if map.cache.contains_key(&chunk.pos) == true {
+    //         commands.entity(entity).despawn_recursive();
+    //     }
+    // }
 
     // Load chunks
     // TODO
@@ -416,11 +422,5 @@ pub fn update_world(
     //         }
     //     }
     // }
-}
-
-fn despawn_system<M: Component>(mut commands: Commands, query: Query<Entity, With<M>>) {
-    query.for_each(|entity| {
-        commands.entity(entity).despawn();
-    });
 }
 // -----------------------------
