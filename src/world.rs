@@ -320,10 +320,10 @@ impl FromWorld for Map {
 
 // ---------- Systems ----------
 pub fn initialize_world(
-    mut commands: Commands,
+    commands: Commands,
     mut map: ResMut<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Generate x*y chunks.
     for x in 0..4 {
@@ -341,25 +341,6 @@ pub fn initialize_world(
             }
         }
     }
-
-    map.chunks.iter().for_each(|(_chunk_pos, chunk)| {
-        commands
-            .spawn(Chunk {
-                blocks: chunk.blocks.clone(),
-                pos: chunk.pos,
-            })
-            .with_children(|parent| {
-                for block in chunk.blocks.iter() {
-                    parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
-                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                        transform: Transform::from_translation(block.position.as_vec3()),
-                        ..Default::default()
-                    });
-                }
-            })
-            .insert(VisibilityBundle::default());
-    });
 
     spawn_chunks(commands, &map, materials);
 }
