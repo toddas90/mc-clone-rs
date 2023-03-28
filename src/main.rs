@@ -45,7 +45,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Minecraft".to_string(),
-                resolution: WindowResolution::new(1280.0, 720.0),
+                resolution: WindowResolution::new(1366.0, 768.0),
                 mode: WindowMode::Windowed,
                 ..Default::default()
             }),
@@ -57,6 +57,6 @@ fn main() {
         .init_resource::<Map>()
         .add_startup_system(init)
         .add_startup_system(initialize_world)
-        .add_system(update_world)
+        // .add_system(update_world)
         .run();
 }

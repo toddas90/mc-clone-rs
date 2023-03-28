@@ -14,11 +14,6 @@ const SEED: u32 = 69420;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const RENDER_DISTANCE: i32 = 4; // In chunks
 
-// POSSIBLE IMPROVEMENTS
-/*
-    1. Use a HashMap insteqd of a HashSet for the blocks in a chunk. - Improve neighbor block checking
-*/
-
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Block {
@@ -47,13 +42,13 @@ impl Chunk {
     fn new(pos: IVec2) -> Self {
         Self {
             blocks: HashSet::new(),
-            pos: pos,
+            pos,
         }
     }
 
     fn gen_blocks(&mut self, noise: &NoiseMap) {
         let offset = IVec3::new(self.pos.x, 0, self.pos.y);
-        // Using the 3d perlin noise, generate a 3d map of blocks
+
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for y in 0..CHUNK_SIZE {
@@ -69,6 +64,25 @@ impl Chunk {
                 }
             }
         }
+
+        // let mut blocks = Arc::new(Mutex::new(HashSet::new()));
+        // // Using the 3d perlin noise, generate a 3d map of blocks in parallel
+        // (0..CHUNK_SIZE).into_par_iter().for_each(|x| {
+        //     for z in 0..CHUNK_SIZE {
+        //         for y in 0..CHUNK_SIZE {
+        //             let height = noise.get_value(
+        //                 x as usize + offset.x as usize,
+        //                 z as usize + offset.z as usize,
+        //             ) * 10.0;
+        //             if (y as f64) < height {
+        //                 let block_pos = IVec3::new(x, y, z) + offset;
+        //                 let block = Block::new(block_pos);
+        //                 blocks.lock().unwrap().insert(block);
+        //             }
+        //         }
+        //     }
+        // });
+        // self.blocks = Arc::try_unwrap(blocks).unwrap().into_inner().unwrap();
     }
 
     fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
@@ -88,17 +102,12 @@ impl Chunk {
                     Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z + 1)),
                 ];
 
-                if other_blocks.contains(&surrounding[0])
+                !(other_blocks.contains(&surrounding[0])
                     && other_blocks.contains(&surrounding[1])
                     && other_blocks.contains(&surrounding[2])
                     && other_blocks.contains(&surrounding[3])
                     && other_blocks.contains(&surrounding[4])
-                    && other_blocks.contains(&surrounding[5])
-                {
-                    false
-                } else {
-                    true
-                }
+                    && other_blocks.contains(&surrounding[5]))
             })
             .collect::<Vec<_>>();
 
@@ -320,7 +329,6 @@ pub fn initialize_world(
     for x in 0..4 {
         for y in 0..4 {
             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            // println!("Generating chunk at {:?}", chunk_pos);
             let mut chunk = Chunk::new(chunk_pos);
             chunk.gen_blocks(&map.noise);
             chunk.gen_meshes(&mut meshes);
@@ -375,13 +383,13 @@ pub fn update_world(
         if pos.x - chunk_pos.x as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
             || pos.y - chunk_pos.y as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
         {
-            temp_cache.insert(chunk_pos.clone(), chunk.clone());
+            temp_cache.insert(*chunk_pos, chunk.clone());
         }
     });
 
     // Unload the chunks.
     map.chunks
-        .retain(|chunk_pos, _| temp_cache.contains_key(chunk_pos) == false);
+        .retain(|chunk_pos, _| !temp_cache.contains_key(chunk_pos));
 
     // Put the chunks into the cache.
     if map.cache.len() < 17 {
@@ -394,7 +402,7 @@ pub fn update_world(
                 temp_cache.remove(chunk_pos);
                 return false;
             }
-            return true;
+            true
         });
 
         // Add the new chunks to the cache.
@@ -403,20 +411,38 @@ pub fn update_world(
 
     // Despawn the chunks.
     for (entity, chunk) in entities.iter() {
-        if map.chunks.contains_key(&chunk.pos) == false {
+        if !map.chunks.contains_key(&chunk.pos) {
             println!("Despawning chunk at {:?}", chunk.pos);
             commands.entity(entity).despawn_recursive();
         }
     }
 
     // Load the chunks.
-    if map.chunks.len() < 10 as usize {
+    if map.chunks.len() < 10_usize {
         let chunk_pos = IVec2::new(
             (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
             (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
         );
 
-        if map.chunks.contains_key(&chunk_pos) == false {
+        // Clippy's suggestion. Only problem is that it is invalid (borrowing).
+        /*
+        409 ~         if let std::collections::hash_map::Entry::Vacant(e) = map.chunks.entry(chunk_pos) {
+        410 +             if map.cache.contains_key(&chunk_pos) {
+        411 +                 println!("Loading chunk at {:?} from cache", chunk_pos);
+        412 +                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
+        413 +                 e.insert(chunk);
+        414 +             } else {
+        415 +                 println!("Generating chunk at {:?}", chunk_pos);
+        416 +                 let mut chunk = Chunk::new(chunk_pos);
+        417 +                 chunk.gen_blocks(&map.noise);
+        418 +                 chunk.gen_meshes(&mut meshes);
+        419 +                 e.insert(chunk);
+        420 +             }
+        421 +             spawn_chunks(commands, &map, materials);
+        422 +         }
+        */
+
+        if !map.chunks.contains_key(&chunk_pos) {
             if map.cache.contains_key(&chunk_pos) {
                 println!("Loading chunk at {:?} from cache", chunk_pos);
                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
