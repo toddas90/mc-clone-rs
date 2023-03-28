@@ -22,7 +22,7 @@ fn init(mut commands: Commands) {
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             shadows_enabled: true,
-            illuminance: 5000.0,
+            illuminance: 6000.0,
             ..default()
         },
         transform: Transform {

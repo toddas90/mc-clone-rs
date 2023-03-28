@@ -10,7 +10,7 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 const CHUNK_SIZE: i32 = 16;
-const SEED: u32 = 4422;
+const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const RENDER_DISTANCE: i32 = 4; // In chunks
 
@@ -76,7 +76,7 @@ impl Chunk {
                 let height = noise.get_value(
                     x as usize + offset.x as usize,
                     z as usize + offset.z as usize,
-                ) * 10.0;
+                ) * CHUNK_SIZE as f64;
                 if (y as f64) < height {
                     let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
                     let block = Block::new(block_pos);
@@ -342,31 +342,31 @@ impl FromWorld for Map {
 // ---------------------------
 
 // ---------- Systems ----------
-pub fn initialize_world(
-    commands: Commands,
-    mut map: ResMut<Map>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Generate x*y chunks.
-    for x in 0..4 {
-        for y in 0..4 {
-            let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-            let mut chunk = Chunk::new(chunk_pos);
-            chunk.gen_blocks(&map.noise);
-            chunk.gen_meshes(&mut meshes);
+// pub fn initialize_world(
+//     commands: Commands,
+//     mut map: ResMut<Map>,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     materials: ResMut<Assets<StandardMaterial>>,
+// ) {
+//     // Generate x*y chunks.
+//     for x in 0..4 {
+//         for y in 0..4 {
+//             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
+//             let mut chunk = Chunk::new(chunk_pos);
+//             chunk.gen_blocks(&map.noise);
+//             chunk.gen_meshes(&mut meshes);
 
-            // I want 4x4 chunks loaded initially, with the outer layer being cached.
-            if x == 4 || y == 4 {
-                map.cache.insert(chunk_pos, chunk);
-            } else {
-                map.chunks.insert(chunk_pos, chunk);
-            }
-        }
-    }
+//             // I want 4x4 chunks loaded initially, with the outer layer being cached.
+//             if x == 4 || y == 4 {
+//                 map.cache.insert(chunk_pos, chunk);
+//             } else {
+//                 map.chunks.insert(chunk_pos, chunk);
+//             }
+//         }
+//     }
 
-    // spawn_chunks(&mut commands, &map.chunks, &materials);
-}
+//     // spawn_chunks(&mut commands, &map.chunks, &materials);
+// }
 
 pub fn update_world(
     mut commands: Commands,
@@ -393,7 +393,7 @@ pub fn update_world(
     // Add the cached chunks to the cache.
     for chunk_pos in cached_chunks.iter() {
         if !map.cache.contains_key(chunk_pos) {
-            println!("Caching chunk at {:?}", chunk_pos);
+            // println!("Caching chunk at {:?}", chunk_pos);
             let chunk = map.chunks.get(chunk_pos).unwrap().clone();
             map.cache.insert(*chunk_pos, chunk);
             map.chunks.remove(chunk_pos);
@@ -401,19 +401,10 @@ pub fn update_world(
     }
 
     // Despawn the chunks.
-    let mut despawned = false;
-    let mut counter = 0;
     for (entity, chunk) in entities.iter() {
         if !map.chunks.contains_key(&chunk.pos) {
-            if !despawned {
-                despawned = true;
-            }
-            counter += 1;
             commands.entity(entity).despawn_recursive();
         }
-    }
-    if despawned {
-        println!("Despawned {} chunks", counter);
     }
 
     // Load the chunks.
@@ -431,21 +422,21 @@ pub fn update_world(
 
         if !map.chunks.contains_key(&chunk_pos) {
             if map.cache.contains_key(&chunk_pos) {
-                println!("Loading chunk at {:?} from cache", chunk_pos);
+                // println!("Loading chunk at {:?} from cache", chunk_pos);
                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
                 map.chunks.insert(chunk_pos, chunk);
                 map.cache.remove(&chunk_pos);
             } else {
-                println!("Generating new chunk at {:?}", chunk_pos);
+                // println!("Generating new chunk at {:?}", chunk_pos);
                 let mut chunk = Chunk::new(chunk_pos);
                 chunk.gen_blocks(&map.noise);
                 chunk.gen_meshes(&mut meshes);
                 map.chunks.insert(chunk_pos, chunk);
             }
-            println!(
-                "Spawning chunk with {} blocks",
-                map.chunks.get(&chunk_pos).unwrap().blocks.len()
-            );
+            // println!(
+            //     "Spawning chunk with {} blocks",
+            //     map.chunks.get(&chunk_pos).unwrap().blocks.len()
+            // );
             spawn_chunk(commands, &chunk_pos, map, materials);
         }
     }
@@ -459,7 +450,7 @@ fn spawn_chunk(
 ) {
     let chunk = map.chunks.get(chunk_pos).unwrap();
 
-    let mut parent = commands
+    commands
         .spawn(Chunk {
             blocks: chunk.blocks.clone(),
             pos: chunk.pos,
