@@ -332,7 +332,6 @@ pub fn update_world(
     // Add the cached chunks to the cache.
     for chunk_pos in cached_chunks.iter() {
         if !map.cache.contains_key(chunk_pos) {
-            // println!("Caching chunk at {:?}", chunk_pos);
             let chunk = map.chunks.get(chunk_pos).unwrap().clone();
             map.cache.insert(*chunk_pos, chunk);
             map.chunks.remove(chunk_pos);
@@ -383,18 +382,15 @@ pub fn update_world(
     for chunk_pos in new_chunks.iter() {
         // Realized that the perlin noise map required usize coordinates...
         if chunk_pos.x < 0 || chunk_pos.y < 0 {
-            // println!("Chunk position is negative, skipping...");
             continue;
         }
 
         if !map.chunks.contains_key(chunk_pos) {
             if map.cache.contains_key(chunk_pos) {
-                // println!("Loading chunk at {:?} from cache", chunk_pos);
                 let chunk = map.cache.get(chunk_pos).unwrap().clone();
                 map.chunks.insert(*chunk_pos, chunk);
                 map.cache.remove(chunk_pos);
             } else {
-                // println!("Generating new chunk at {:?}", chunk_pos);
                 let mut chunk = Chunk::new(*chunk_pos);
                 chunk.gen_blocks(&map.noise);
                 chunk.gen_meshes(&mut meshes);
