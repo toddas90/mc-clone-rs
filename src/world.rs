@@ -361,8 +361,8 @@ pub fn update_world(
 
     // If the chunk is outside of the render distance, unload it.
     map.chunks.iter().for_each(|(chunk_pos, chunk)| {
-        if pos.x - chunk_pos.x as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
-            || pos.y - chunk_pos.y as f32 > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+        if (pos.x - chunk_pos.x as f32).abs() > (CHUNK_SIZE * RENDER_DISTANCE) as f32
+            || (pos.y - chunk_pos.y as f32).abs() > (CHUNK_SIZE * RENDER_DISTANCE) as f32
         {
             temp_cache.insert(*chunk_pos, chunk.clone());
         }
