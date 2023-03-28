@@ -25,3 +25,4 @@ bevy_flycam = { git = "https://github.com/NiklasEi/bevy_flycam/", branch = "bevy
 noise = "0.8.2" # For generating terrain
 rand = "0.8.4"
 rayon = "1.5.1" # For generating terrain
+# block-mesh = "0.2.0" # For generating terrain mesh

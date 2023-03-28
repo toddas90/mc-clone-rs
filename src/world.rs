@@ -49,25 +49,48 @@ impl Chunk {
     fn gen_blocks(&mut self, noise: &NoiseMap) {
         let offset = IVec3::new(self.pos.x, 0, self.pos.y);
 
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                for y in 0..CHUNK_SIZE {
-                    let height = noise.get_value(
-                        x as usize + offset.x as usize,
-                        z as usize + offset.z as usize,
-                    ) * 10.0;
-                    if (y as f64) < height {
-                        let block_pos = IVec3::new(x, y, z) + offset;
-                        let block = Block::new(block_pos);
-                        self.blocks.insert(block);
-                    }
-                }
+        for i in 0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE {
+            let x = i % CHUNK_SIZE;
+            let z = (i / CHUNK_SIZE) % CHUNK_SIZE;
+            let y = i / (CHUNK_SIZE * CHUNK_SIZE);
+            let height = noise.get_value(
+                x as usize + offset.x as usize,
+                z as usize + offset.z as usize,
+            ) * 10.0;
+            if (y as f64) < height {
+                let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
+                let block = Block::new(block_pos);
+                self.blocks.insert(block);
             }
         }
 
-        // let mut blocks = Arc::new(Mutex::new(HashSet::new()));
-        // // Using the 3d perlin noise, generate a 3d map of blocks in parallel
-        // (0..CHUNK_SIZE).into_par_iter().for_each(|x| {
+        // ----- Parallel -----
+        // let blocks_mutex = Arc::new(Mutex::new(HashSet::new()));
+
+        // (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+        //     .into_par_iter()
+        //     .for_each(|i| {
+        //         let x = i % CHUNK_SIZE;
+        //         let z = (i / CHUNK_SIZE) % CHUNK_SIZE;
+        //         let y = i / (CHUNK_SIZE * CHUNK_SIZE);
+        //         let height = noise.get_value(
+        //             x as usize + offset.x as usize,
+        //             z as usize + offset.z as usize,
+        //         ) * 10.0;
+        //         if (y as f64) < height {
+        //             let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
+        //             let block = Block::new(block_pos);
+        //             let mut blocks = blocks_mutex.lock().unwrap();
+        //             blocks.insert(block);
+        //         }
+        //     });
+
+        // self.blocks
+        //     .extend(Arc::try_unwrap(blocks_mutex).unwrap().into_inner().unwrap());
+        // ----- Parallel -----
+
+        // ----- Old -----
+        // for x in 0..CHUNK_SIZE {
         //     for z in 0..CHUNK_SIZE {
         //         for y in 0..CHUNK_SIZE {
         //             let height = noise.get_value(
@@ -77,12 +100,12 @@ impl Chunk {
         //             if (y as f64) < height {
         //                 let block_pos = IVec3::new(x, y, z) + offset;
         //                 let block = Block::new(block_pos);
-        //                 blocks.lock().unwrap().insert(block);
+        //                 self.blocks.insert(block);
         //             }
         //         }
         //     }
-        // });
-        // self.blocks = Arc::try_unwrap(blocks).unwrap().into_inner().unwrap();
+        // }
+        // ----- Old -----
     }
 
     fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
