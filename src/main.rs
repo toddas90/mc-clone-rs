@@ -41,7 +41,7 @@ fn init(mut commands: Commands) {
 
 fn main() {
     App::new()
-        .insert_resource(Msaa::Sample4)
+        .insert_resource(Msaa::Sample2)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Minecraft".to_string(),

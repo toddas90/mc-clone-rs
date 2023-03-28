@@ -13,6 +13,11 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
+# Enable high optimizations for our code, but not for dependencies (incl. Bevy):
+[profile.release]
+lto = "thin"
+# debug = true
+
 [dependencies]
 bevy = { version = "0.10.0", features = ["dynamic_linking"] }
 # bevy = "0.10.0"

@@ -392,7 +392,7 @@ pub fn update_world(
         .retain(|chunk_pos, _| !temp_cache.contains_key(chunk_pos));
 
     // Put the chunks into the cache.
-    if map.cache.len() < 17 {
+    if map.cache.len() < 32 {
         map.cache.extend(temp_cache);
     } else {
         // Remove chunks from cache.
@@ -423,24 +423,6 @@ pub fn update_world(
             (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
             (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
         );
-
-        // Clippy's suggestion. Only problem is that it is invalid (borrowing).
-        /*
-        409 ~         if let std::collections::hash_map::Entry::Vacant(e) = map.chunks.entry(chunk_pos) {
-        410 +             if map.cache.contains_key(&chunk_pos) {
-        411 +                 println!("Loading chunk at {:?} from cache", chunk_pos);
-        412 +                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
-        413 +                 e.insert(chunk);
-        414 +             } else {
-        415 +                 println!("Generating chunk at {:?}", chunk_pos);
-        416 +                 let mut chunk = Chunk::new(chunk_pos);
-        417 +                 chunk.gen_blocks(&map.noise);
-        418 +                 chunk.gen_meshes(&mut meshes);
-        419 +                 e.insert(chunk);
-        420 +             }
-        421 +             spawn_chunks(commands, &map, materials);
-        422 +         }
-        */
 
         if !map.chunks.contains_key(&chunk_pos) {
             if map.cache.contains_key(&chunk_pos) {
