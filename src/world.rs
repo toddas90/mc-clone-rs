@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
-use bevy::render::primitives::Frustum;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy_flycam::FlyCam;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
