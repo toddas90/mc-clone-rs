@@ -11,6 +11,9 @@ use bevy_flycam::PlayerPlugin;
 mod world;
 use world::*;
 
+const CHUNK_SIZE: i32 = 16;
+const RENDER_DISTANCE: i32 = 4; // In chunks
+
 // This is a simple example of a camera that flies around.
 // There's an included example of a system that toggles the "enabled"
 // property of the fly camera with "T"
@@ -22,18 +25,18 @@ fn init(mut commands: Commands) {
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             shadows_enabled: true,
-            illuminance: 6000.0,
+            illuminance: 10000.0,
             ..default()
         },
         transform: Transform {
-            translation: Vec3::new(0.0, 2.0, 0.0),
+            translation: Vec3::new(0.0, 100.0, 0.0),
             rotation: Quat::from_rotation_x(-PI / 4.),
             ..default()
         },
         cascade_shadow_config: CascadeShadowConfigBuilder {
-            first_cascade_far_bound: 10.0,
+            first_cascade_far_bound: CHUNK_SIZE as f32,
             num_cascades: 4,
-            maximum_distance: 100.0,
+            maximum_distance: CHUNK_SIZE as f32 * RENDER_DISTANCE as f32,
             ..default()
         }
         .into(),

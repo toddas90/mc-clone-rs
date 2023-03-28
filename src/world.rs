@@ -110,7 +110,6 @@ impl Chunk {
             let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
             let block_pos = block_pos + BLOCK_SIZE;
 
-            let mut block_verticies = Vec::new();
             let block_indicies = vec![
                 0, 1, 3, 3, 1, 2, // Front
                 1, 5, 2, 2, 5, 6, // Right
@@ -121,138 +120,38 @@ impl Chunk {
             ];
 
             // Need to figure out an effective way to only render the faces that are visible
-
-            // Front
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-
-            // Back
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-
-            // Left
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-
-            // Right
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-
-            // Top
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y + 1.0,
-                block_pos.z + 1.0,
-            ));
-
-            // Bottom
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z - 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x + 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
-            block_verticies.push(Vec3::new(
-                block_pos.x - 1.0,
-                block_pos.y - 1.0,
-                block_pos.z + 1.0,
-            ));
+            let block_verticies = vec![
+                // Front
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                // Back
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                // Left
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                // Right
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                // Top
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+                // Bottom
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z - 1.0),
+                Vec3::new(block_pos.x + 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+                Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
+            ];
 
             // In this example, normals and UVs don't matter,
             // so we just use the same value for all of them
