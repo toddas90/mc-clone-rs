@@ -373,78 +373,75 @@ pub fn update_world(
     }
 
     // Load the chunks.
-    if map.chunks.len() < 16_usize {
-        let player_pos = IVec2::new(
-            (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
-            (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
-        );
+    let player_pos = IVec2::new(
+        (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
+        (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
+    );
 
-        // Get chunks around player_pos and put them all in new_chunks.
-        let mut new_chunks = vec![
-            player_pos,
-            player_pos + IVec2::new(CHUNK_SIZE, 0),
-            player_pos + IVec2::new(0, CHUNK_SIZE),
-            player_pos + IVec2::new(CHUNK_SIZE, CHUNK_SIZE),
-            player_pos + IVec2::new(-CHUNK_SIZE, 0),
-            player_pos + IVec2::new(0, -CHUNK_SIZE),
-            player_pos + IVec2::new(-CHUNK_SIZE, -CHUNK_SIZE),
-            player_pos + IVec2::new(-CHUNK_SIZE, CHUNK_SIZE),
-            player_pos + IVec2::new(CHUNK_SIZE, -CHUNK_SIZE),
-        ];
+    // Get chunks around player_pos and put them all in new_chunks.
+    let mut new_chunks = vec![
+        player_pos,
+        player_pos + IVec2::new(CHUNK_SIZE, 0),
+        player_pos + IVec2::new(0, CHUNK_SIZE),
+        player_pos + IVec2::new(CHUNK_SIZE, CHUNK_SIZE),
+        player_pos + IVec2::new(-CHUNK_SIZE, 0),
+        player_pos + IVec2::new(0, -CHUNK_SIZE),
+        player_pos + IVec2::new(-CHUNK_SIZE, -CHUNK_SIZE),
+        player_pos + IVec2::new(-CHUNK_SIZE, CHUNK_SIZE),
+        player_pos + IVec2::new(CHUNK_SIZE, -CHUNK_SIZE),
+    ];
 
-        // Remove chunks that are already loaded.
-        new_chunks.retain(|chunk_pos| !map.chunks.contains_key(chunk_pos));
+    // Remove chunks that are already loaded.
+    new_chunks.retain(|chunk_pos| !map.chunks.contains_key(chunk_pos));
 
-        // Remove chunks that are already cached.
-        new_chunks.retain(|chunk_pos| !map.cache.contains_key(chunk_pos));
+    // Remove chunks that are already cached.
+    new_chunks.retain(|chunk_pos| !map.cache.contains_key(chunk_pos));
 
-        // Remove chunks that are behind the player.
-        new_chunks.retain(|chunk_pos| {
-            let distance = (chunk_pos.as_vec2() - pos).length();
-            distance < (CHUNK_SIZE * RENDER_DISTANCE) as f32
-        });
+    // Remove chunks that are behind the player.
+    new_chunks.retain(|chunk_pos| {
+        let distance = (chunk_pos.as_vec2() - pos).length();
+        distance < (CHUNK_SIZE * RENDER_DISTANCE) as f32
+    });
 
-        // Load the chunks.
-        for chunk_pos in new_chunks.iter() {
-            // Realized that the perlin noise map required usize coordinates...
-            if chunk_pos.x < 0 || chunk_pos.y < 0 {
-                // println!("Chunk position is negative, skipping...");
-                continue;
-            }
-
-            if !map.chunks.contains_key(chunk_pos) {
-                if map.cache.contains_key(chunk_pos) {
-                    // println!("Loading chunk at {:?} from cache", chunk_pos);
-                    let chunk = map.cache.get(chunk_pos).unwrap().clone();
-                    map.chunks.insert(*chunk_pos, chunk);
-                    map.cache.remove(chunk_pos);
-                } else {
-                    // println!("Generating new chunk at {:?}", chunk_pos);
-                    let mut chunk = Chunk::new(*chunk_pos);
-                    chunk.gen_blocks(&map.noise);
-                    chunk.gen_meshes(&mut meshes);
-
-                    map.chunks.insert(*chunk_pos, chunk);
-                }
-            }
-            let chunk = map.chunks.get(chunk_pos).unwrap();
-            commands
-                .spawn(Chunk {
-                    blocks: chunk.blocks.clone(),
-                    pos: chunk.pos,
-                })
-                .with_children(|parent| {
-                    for block in chunk.blocks.iter() {
-                        parent.spawn(PbrBundle {
-                            mesh: block.mesh.clone(),
-                            material: materials
-                                .add(Color::rgb(126.0 / 255.0, 200.0 / 255.0, 80.0 / 255.0).into()),
-                            ..Default::default()
-                        });
-                    }
-                })
-                .insert(VisibilityBundle::default());
+    // Load the chunks.
+    for chunk_pos in new_chunks.iter() {
+        // Realized that the perlin noise map required usize coordinates...
+        if chunk_pos.x < 0 || chunk_pos.y < 0 {
+            // println!("Chunk position is negative, skipping...");
+            continue;
         }
+
+        if !map.chunks.contains_key(chunk_pos) {
+            if map.cache.contains_key(chunk_pos) {
+                // println!("Loading chunk at {:?} from cache", chunk_pos);
+                let chunk = map.cache.get(chunk_pos).unwrap().clone();
+                map.chunks.insert(*chunk_pos, chunk);
+                map.cache.remove(chunk_pos);
+            } else {
+                // println!("Generating new chunk at {:?}", chunk_pos);
+                let mut chunk = Chunk::new(*chunk_pos);
+                chunk.gen_blocks(&map.noise);
+                chunk.gen_meshes(&mut meshes);
+                map.chunks.insert(*chunk_pos, chunk);
+            }
+        }
+        let chunk = map.chunks.get(chunk_pos).unwrap();
+        commands
+            .spawn(Chunk {
+                blocks: chunk.blocks.clone(),
+                pos: chunk.pos,
+            })
+            .with_children(|parent| {
+                for block in chunk.blocks.iter() {
+                    parent.spawn(PbrBundle {
+                        mesh: block.mesh.clone(),
+                        material: materials
+                            .add(Color::rgb(126.0 / 255.0, 200.0 / 255.0, 80.0 / 255.0).into()),
+                        ..Default::default()
+                    });
+                }
+            })
+            .insert(VisibilityBundle::default());
     }
 }
 // -----------------------------
