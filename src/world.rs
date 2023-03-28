@@ -366,7 +366,7 @@ pub fn initialize_world(
         }
     }
 
-    spawn_chunks(commands, &map, materials);
+    // spawn_chunks(&mut commands, &map.chunks, &materials);
 }
 
 pub fn update_world(
@@ -447,33 +447,34 @@ pub fn update_world(
                 "Spawning chunk with {} blocks",
                 map.chunks.get(&chunk_pos).unwrap().blocks.len()
             );
-            spawn_chunks(commands, &map, materials);
+            spawn_chunk(commands, &chunk_pos, map, materials);
         }
     }
 }
 
-fn spawn_chunks(
+fn spawn_chunk(
     mut commands: Commands,
-    map: &Map,
+    chunk_pos: &IVec2,
+    map: ResMut<Map>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for chunk in map.chunks.values() {
-        commands
-            .spawn(Chunk {
-                blocks: chunk.blocks.clone(),
-                pos: chunk.pos,
-            })
-            .with_children(|parent| {
-                for block in chunk.blocks.iter() {
-                    parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
-                        material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
-                        transform: Transform::from_translation(block.position.as_vec3()),
-                        ..Default::default()
-                    });
-                }
-            })
-            .insert(VisibilityBundle::default());
-    }
+    let chunk = map.chunks.get(chunk_pos).unwrap();
+
+    let mut parent = commands
+        .spawn(Chunk {
+            blocks: chunk.blocks.clone(),
+            pos: chunk.pos,
+        })
+        .with_children(|parent| {
+            for block in chunk.blocks.iter() {
+                parent.spawn(PbrBundle {
+                    mesh: block.mesh.clone(),
+                    material: materials
+                        .add(Color::rgb(51.0 / 255.0, 153.0 / 255.0, 51.0 / 255.0).into()),
+                    ..Default::default()
+                });
+            }
+        })
+        .insert(VisibilityBundle::default());
 }
 // -----------------------------
