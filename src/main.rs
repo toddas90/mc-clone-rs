@@ -56,7 +56,7 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .init_resource::<Map>()
         .add_startup_system(init)
-        .add_startup_system(initialize_world)
+        // .add_startup_system(initialize_world)
         .add_system(update_world)
         .run();
 }

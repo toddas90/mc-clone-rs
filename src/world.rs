@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
+use bevy::render::primitives::Frustum;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy_flycam::FlyCam;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
@@ -10,9 +11,9 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 const CHUNK_SIZE: i32 = 16;
-const SEED: u32 = 69420;
+const SEED: u32 = 4422;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-const RENDER_DISTANCE: i32 = 4; // In chunks
+const RENDER_DISTANCE: i32 = 3; // In chunks
 
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
@@ -380,49 +381,44 @@ pub fn update_world(
     let camera = camera.single();
     let pos = Vec2::new(camera.translation.x, camera.translation.z);
 
-    let mut temp_cache = HashMap::new();
+    let mut cached_chunks = Vec::new();
 
-    // If the chunk is outside of the render distance, unload it.
-    map.chunks.iter().for_each(|(chunk_pos, chunk)| {
-        if (pos.x - chunk_pos.x as f32).abs() > (CHUNK_SIZE * RENDER_DISTANCE) as f32
-            || (pos.y - chunk_pos.y as f32).abs() > (CHUNK_SIZE * RENDER_DISTANCE) as f32
-        {
-            temp_cache.insert(*chunk_pos, chunk.clone());
+    // Remove chunks outside the render distance and add them to the cache.
+    for (chunk_pos, _chunk) in map.chunks.iter() {
+        let distance = (chunk_pos.as_vec2() - pos).length();
+        if distance > (CHUNK_SIZE * RENDER_DISTANCE) as f32 {
+            cached_chunks.push(*chunk_pos);
         }
-    });
+    }
 
-    // Unload the chunks.
-    map.chunks
-        .retain(|chunk_pos, _| !temp_cache.contains_key(chunk_pos));
-
-    // Put the chunks into the cache.
-    if map.cache.len() < 32 {
-        map.cache.extend(temp_cache);
-    } else {
-        // Remove chunks from cache.
-        let mut temp_cache = temp_cache;
-        map.cache.retain(|chunk_pos, _| {
-            if temp_cache.contains_key(chunk_pos) {
-                temp_cache.remove(chunk_pos);
-                return false;
-            }
-            true
-        });
-
-        // Add the new chunks to the cache.
-        map.cache.extend(temp_cache);
+    // Add the cached chunks to the cache.
+    for chunk_pos in cached_chunks.iter() {
+        if !map.cache.contains_key(chunk_pos) {
+            println!("Caching chunk at {:?}", chunk_pos);
+            let chunk = map.chunks.get(chunk_pos).unwrap().clone();
+            map.cache.insert(*chunk_pos, chunk);
+            map.chunks.remove(chunk_pos);
+        }
     }
 
     // Despawn the chunks.
+    let mut despawned = false;
+    let mut counter = 0;
     for (entity, chunk) in entities.iter() {
         if !map.chunks.contains_key(&chunk.pos) {
-            println!("Despawning chunk at {:?}", chunk.pos);
+            if !despawned {
+                despawned = true;
+            }
+            counter += 1;
             commands.entity(entity).despawn_recursive();
         }
     }
+    if despawned {
+        println!("Despawned {} chunks", counter);
+    }
 
     // Load the chunks.
-    if map.chunks.len() < 10_usize {
+    if map.chunks.len() < 9_usize {
         let chunk_pos = IVec2::new(
             (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
             (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
@@ -433,8 +429,9 @@ pub fn update_world(
                 println!("Loading chunk at {:?} from cache", chunk_pos);
                 let chunk = map.cache.get(&chunk_pos).unwrap().clone();
                 map.chunks.insert(chunk_pos, chunk);
+                map.cache.remove(&chunk_pos);
             } else {
-                println!("Generating chunk at {:?}", chunk_pos);
+                println!("Generating new chunk at {:?}", chunk_pos);
                 let mut chunk = Chunk::new(chunk_pos);
                 chunk.gen_blocks(&map.noise);
                 chunk.gen_meshes(&mut meshes);
