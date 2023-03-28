@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-const RENDER_DISTANCE: i32 = 4; // In chunks
+const RENDER_DISTANCE: i32 = 3; // In chunks
 
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
@@ -364,6 +364,17 @@ pub fn update_world(
             map.chunks.remove(chunk_pos);
         }
     }
+
+    // Remove cached chunks that are too far away.
+    map.cache.retain(|chunk_pos, _chunk| {
+        let distance = (chunk_pos.as_vec2() - pos).length();
+        if distance > (CHUNK_SIZE * RENDER_DISTANCE) as f32 {
+            cached_chunks.push(*chunk_pos);
+            false
+        } else {
+            true
+        }
+    });
 
     // Despawn the chunks.
     for (entity, chunk) in entities.iter() {
