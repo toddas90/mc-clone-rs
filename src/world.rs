@@ -307,32 +307,6 @@ impl FromWorld for Map {
 // ---------------------------
 
 // ---------- Systems ----------
-// pub fn initialize_world(
-//     commands: Commands,
-//     mut map: ResMut<Map>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     materials: ResMut<Assets<StandardMaterial>>,
-// ) {
-//     // Generate x*y chunks.
-//     for x in 0..4 {
-//         for y in 0..4 {
-//             let chunk_pos = IVec2::new(x * CHUNK_SIZE, y * CHUNK_SIZE);
-//             let mut chunk = Chunk::new(chunk_pos);
-//             chunk.gen_blocks(&map.noise);
-//             chunk.gen_meshes(&mut meshes);
-
-//             // I want 4x4 chunks loaded initially, with the outer layer being cached.
-//             if x == 4 || y == 4 {
-//                 map.cache.insert(chunk_pos, chunk);
-//             } else {
-//                 map.chunks.insert(chunk_pos, chunk);
-//             }
-//         }
-//     }
-
-//     // spawn_chunks(&mut commands, &map.chunks, &materials);
-// }
-
 pub fn update_world(
     mut commands: Commands,
     mut map: ResMut<Map>,

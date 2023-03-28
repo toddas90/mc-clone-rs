@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     window::{WindowMode, WindowResolution},
 };
-use bevy_flycam::{FlyCam, PlayerPlugin};
+use bevy_flycam::PlayerPlugin;
 
 mod world;
 use world::*;
@@ -43,11 +43,11 @@ fn init(mut commands: Commands) {
 
 fn main() {
     App::new()
-        .insert_resource(Msaa::Sample2)
+        .insert_resource(Msaa::Sample4)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Minecraft".to_string(),
-                resolution: WindowResolution::new(1366.0, 768.0),
+                resolution: WindowResolution::new(1440.0, 1080.0), // 4:3
                 mode: WindowMode::Windowed,
                 ..Default::default()
             }),
@@ -58,7 +58,6 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .init_resource::<Map>()
         .add_startup_system(init)
-        // .add_startup_system(initialize_world)
         .add_system(update_world)
         .run();
 }
