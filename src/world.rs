@@ -57,7 +57,7 @@ impl Chunk {
             let height = noise.get_value(
                 x as usize + offset.x as usize,
                 z as usize + offset.z as usize,
-            ) * 10.0;
+            ) * CHUNK_SIZE as f64;
             if (y as f64) < height {
                 let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
                 let block = Block::new(block_pos);
@@ -424,6 +424,12 @@ pub fn update_world(
             (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
         );
 
+        // Realized that the perlin noise map required usize coordinates...
+        if chunk_pos.x < 0 || chunk_pos.y < 0 {
+            // println!("Chunk position is negative, skipping...");
+            return;
+        }
+
         if !map.chunks.contains_key(&chunk_pos) {
             if map.cache.contains_key(&chunk_pos) {
                 println!("Loading chunk at {:?} from cache", chunk_pos);
@@ -437,6 +443,10 @@ pub fn update_world(
                 chunk.gen_meshes(&mut meshes);
                 map.chunks.insert(chunk_pos, chunk);
             }
+            println!(
+                "Spawning chunk with {} blocks",
+                map.chunks.get(&chunk_pos).unwrap().blocks.len()
+            );
             spawn_chunks(commands, &map, materials);
         }
     }
@@ -447,7 +457,6 @@ fn spawn_chunks(
     map: &Map,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    println!("Spawning chunks");
     for chunk in map.chunks.values() {
         commands
             .spawn(Chunk {
