@@ -391,17 +391,8 @@ pub fn update_world(
         player_pos + IVec2::new(CHUNK_SIZE, -CHUNK_SIZE),
     ];
 
-    // Remove chunks that are already loaded.
+    // Remove chunks that are already loaded or cached.
     new_chunks.retain(|chunk_pos| !map.chunks.contains_key(chunk_pos));
-
-    // Remove chunks that are already cached.
-    new_chunks.retain(|chunk_pos| !map.cache.contains_key(chunk_pos));
-
-    // Remove chunks that are behind the player.
-    new_chunks.retain(|chunk_pos| {
-        let distance = (chunk_pos.as_vec2() - pos).length();
-        distance < (CHUNK_SIZE * RENDER_DISTANCE) as f32
-    });
 
     // Load the chunks.
     for chunk_pos in new_chunks.iter() {
