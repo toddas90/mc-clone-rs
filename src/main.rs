@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     window::{WindowMode, WindowResolution},
 };
-use bevy_flycam::PlayerPlugin;
+use bevy_flycam::{FlyCam, PlayerPlugin};
 
 mod world;
 use world::*;
@@ -16,6 +16,8 @@ use world::*;
 // property of the fly camera with "T"
 
 fn init(mut commands: Commands) {
+    // Change the Plugin's camera spawn position!
+
     // directional 'sun' light
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {

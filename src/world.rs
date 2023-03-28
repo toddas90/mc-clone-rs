@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 4422;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-const RENDER_DISTANCE: i32 = 3; // In chunks
+const RENDER_DISTANCE: i32 = 4; // In chunks
 
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
@@ -418,7 +418,7 @@ pub fn update_world(
     }
 
     // Load the chunks.
-    if map.chunks.len() < 9_usize {
+    if map.chunks.len() < 16_usize {
         let chunk_pos = IVec2::new(
             (pos.x / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
             (pos.y / CHUNK_SIZE as f32).floor() as i32 * CHUNK_SIZE,
@@ -470,7 +470,7 @@ fn spawn_chunk(
                 parent.spawn(PbrBundle {
                     mesh: block.mesh.clone(),
                     material: materials
-                        .add(Color::rgb(51.0 / 255.0, 153.0 / 255.0, 51.0 / 255.0).into()),
+                        .add(Color::rgb(126.0 / 255.0, 200.0 / 255.0, 80.0 / 255.0).into()),
                     ..Default::default()
                 });
             }
