@@ -159,7 +159,7 @@ impl Chunk {
                 Mesh::ATTRIBUTE_NORMAL,
                 vec![[0., 1., 0.]; block_verticies.len()],
             );
-            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0., 0.]; block_verticies.len()]);
+            // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
             new_meshes.lock().unwrap().insert(block.position, mesh);
