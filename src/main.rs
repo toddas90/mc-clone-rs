@@ -6,10 +6,13 @@ use bevy::{
     prelude::*,
     window::{WindowMode, WindowResolution},
 };
-use bevy_flycam::PlayerPlugin;
+// use bevy_flycam::PlayerPlugin;
 
 mod world;
 use world::*;
+
+mod cam;
+use cam::*;
 
 const CHUNK_SIZE: i32 = 16;
 const RENDER_DISTANCE: i32 = 4; // In chunks

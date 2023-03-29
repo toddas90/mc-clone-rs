@@ -21,7 +21,7 @@ lto = "thin"
 [dependencies]
 bevy = { version = "0.10.0", features = ["dynamic_linking"] }
 # bevy = "0.10.0"
-bevy_flycam = { git = "https://github.com/NiklasEi/bevy_flycam/", branch = "bevy_main" }
+# bevy_flycam = { git = "https://github.com/NiklasEi/bevy_flycam/", branch = "bevy_main" }
 noise = "0.8.2" # For generating terrain
 rand = "0.8.4"
 rayon = "1.5.1" # For generating terrain

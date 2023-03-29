@@ -479,14 +479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_flycam"
-version = "0.10.0"
-source = "git+https://github.com/NiklasEi/bevy_flycam/?branch=bevy_main#7d69689606047ff04e8c608f1e62dfb12e2ec002"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "bevy_gilrs"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2068,7 +2060,6 @@ name = "minecraft"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_flycam",
  "noise",
  "rand 0.8.5",
  "rayon",

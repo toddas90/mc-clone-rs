@@ -1,13 +1,16 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use bevy_flycam::FlyCam;
+// use bevy_flycam::FlyCam;
+use cam::*;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
+
+use crate::cam;
 
 const CHUNK_SIZE: i32 = 16;
 const SEED: u32 = 14;
