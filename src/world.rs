@@ -74,6 +74,7 @@ impl Chunk {
 
         let blocks_mutex = Arc::new(Mutex::new(HashMap::new()));
 
+        // Iterate through the blocks and create them. Meshes are handled elsewhere.
         (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
             .rev()
@@ -109,6 +110,7 @@ impl Chunk {
     }
 
     fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
+        // Find the blocks that are not buried.
         let temp = self.blocks.clone();
         let visible_blocks = temp
             .par_iter()
@@ -137,7 +139,6 @@ impl Chunk {
         let new_meshes = Arc::new(Mutex::new(HashMap::new()));
 
         // For each visible block, get the verticies and indicies that are not back to back with other blocks.
-        // This will result in a smaller mesh, and less draw calls.
         visible_blocks.par_iter().for_each(|block| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
@@ -242,6 +243,27 @@ impl FromWorld for Map {
 // ---------------------------
 
 // ---------- Systems ----------
+// pub fn destroy_block() {
+//     // If the mouse is clicked, remove the block that the cursor is over.
+//     if is_mouse_button_pressed(MouseButton::Left) {
+//         let mut ray = Ray::new(
+//             camera.translation,
+//             camera.rotation * Vec3::new(0.0, 0.0, -1.0),
+//         );
+//         let mut hit = false;
+//         let mut block_pos = IVec3::new(0, 0, 0);
+//         while !hit {
+//             let block = map.get_block(ray.position);
+//             if block != Block::Air {
+//                 block_pos = ray.position;
+//                 hit = true;
+//             }
+//             ray.position += ray.direction;
+//         }
+//         map.set_block(block_pos, Block::Air);
+//     }
+// }
+
 pub fn update_world(
     mut commands: Commands,
     mut map: ResMut<Map>,
