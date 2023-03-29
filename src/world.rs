@@ -44,6 +44,7 @@ pub enum BlockType {
 impl BlockType {
     fn get_color(&self) -> Color {
         match self {
+            // Colors from https://encycolorpedia.com/
             BlockType::Grass => Color::rgb(145.0 / 255.0, 203.0 / 255.0, 125.0 / 255.0), // Fresh Cut Grass #91cb7d
             BlockType::Dirt => Color::rgb(155.0 / 255.0, 118.0 / 255.0, 83.0 / 255.0), // Dirt #9b7653
             BlockType::Stone => Color::rgb(159.0 / 255.0, 148.0 / 255.0, 132.0 / 255.0), // Stone #9f9484
@@ -75,6 +76,7 @@ impl Chunk {
 
         (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
+            .rev()
             .for_each(|i| {
                 let x = i % CHUNK_SIZE;
                 let z = (i / CHUNK_SIZE) % CHUNK_SIZE;
@@ -85,12 +87,13 @@ impl Chunk {
                 ) * CHUNK_SIZE as f64;
                 if (y as f64) < height {
                     let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
+                    let upper_block_pos = IVec3::new(x, (y + 1) % CHUNK_SIZE, z) + offset;
                     let block = {
                         if y == 0 {
                             Block::new(BlockType::Bedrock)
-                        } else if y < 3 {
+                        } else if y < 3 && self.blocks.contains_key(&upper_block_pos) {
                             Block::new(BlockType::Stone)
-                        } else if y < 5 {
+                        } else if y < 5 && self.blocks.contains_key(&upper_block_pos) {
                             Block::new(BlockType::Dirt)
                         } else {
                             Block::new(BlockType::Grass)

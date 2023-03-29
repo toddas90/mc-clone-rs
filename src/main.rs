@@ -59,8 +59,8 @@ fn main() {
             }),
             ..Default::default()
         }))
-        .add_plugin(LogDiagnosticsPlugin::default())
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugin(LogDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(PlayerPlugin)
         .init_resource::<Map>()
         .add_startup_system(init)
