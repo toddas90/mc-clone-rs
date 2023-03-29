@@ -6,7 +6,7 @@ use cam::*;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
 use noise::{Fbm, Perlin};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
@@ -25,7 +25,7 @@ pub struct Block {
 }
 
 impl Block {
-    fn new(position: IVec3, btype: BlockType) -> Self {
+    fn new(btype: BlockType) -> Self {
         Self {
             mesh: Default::default(),
             btype,
@@ -38,18 +38,16 @@ pub enum BlockType {
     Grass,
     Dirt,
     Stone,
-    Water,
     Bedrock,
 }
 
 impl BlockType {
     fn get_color(&self) -> Color {
         match self {
-            BlockType::Grass => Color::rgb(0.0, 1.0, 0.0),
-            BlockType::Dirt => Color::rgb(0.5, 0.35, 0.05),
-            BlockType::Stone => Color::rgb(0.5, 0.5, 0.5),
-            BlockType::Water => Color::rgb(0.0, 0.0, 1.0),
-            BlockType::Bedrock => Color::rgb(0.1, 0.1, 0.1),
+            BlockType::Grass => Color::rgb(145.0 / 255.0, 203.0 / 255.0, 125.0 / 255.0), // Fresh Cut Grass #91cb7d
+            BlockType::Dirt => Color::rgb(155.0 / 255.0, 118.0 / 255.0, 83.0 / 255.0), // Dirt #9b7653
+            BlockType::Stone => Color::rgb(159.0 / 255.0, 148.0 / 255.0, 132.0 / 255.0), // Stone #9f9484
+            BlockType::Bedrock => Color::rgb(77.0 / 255.0, 78.0 / 255.0, 82.0 / 255.0), // Nippon Bedrock Bottom #4d4e52
         }
     }
 }
@@ -89,13 +87,13 @@ impl Chunk {
                     let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
                     let block = {
                         if y == 0 {
-                            Block::new(block_pos, BlockType::Bedrock)
+                            Block::new(BlockType::Bedrock)
                         } else if y < 3 {
-                            Block::new(block_pos, BlockType::Stone)
+                            Block::new(BlockType::Stone)
                         } else if y < 5 {
-                            Block::new(block_pos, BlockType::Dirt)
+                            Block::new(BlockType::Dirt)
                         } else {
-                            Block::new(block_pos, BlockType::Grass)
+                            Block::new(BlockType::Grass)
                         }
                     };
                     let mut blocks = blocks_mutex.lock().unwrap();

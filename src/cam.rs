@@ -60,7 +60,6 @@ fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow
 fn setup_player(mut commands: Commands) {
     commands.spawn((
         Camera3dBundle {
-            // This makes the game orthographic. The W and S keys don't move properly, but everything else does.
             // projection: OrthographicProjection {
             //     scale: 5.0,
             //     scaling_mode: ScalingMode::FixedVertical(2.0),
