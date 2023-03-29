@@ -20,15 +20,36 @@ const RENDER_DISTANCE: i32 = 3; // In chunks
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Block {
-    position: IVec3,
     mesh: Handle<Mesh>,
+    btype: BlockType,
 }
 
 impl Block {
-    fn new(position: IVec3) -> Self {
+    fn new(position: IVec3, btype: BlockType) -> Self {
         Self {
-            position,
             mesh: Default::default(),
+            btype,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum BlockType {
+    Grass,
+    Dirt,
+    Stone,
+    Water,
+    Bedrock,
+}
+
+impl BlockType {
+    fn get_color(&self) -> Color {
+        match self {
+            BlockType::Grass => Color::rgb(0.0, 1.0, 0.0),
+            BlockType::Dirt => Color::rgb(0.5, 0.35, 0.05),
+            BlockType::Stone => Color::rgb(0.5, 0.5, 0.5),
+            BlockType::Water => Color::rgb(0.0, 0.0, 1.0),
+            BlockType::Bedrock => Color::rgb(0.1, 0.1, 0.1),
         }
     }
 }
@@ -37,14 +58,14 @@ impl Block {
 // ---------- Chunk ----------
 #[derive(Component, Clone)]
 pub struct Chunk {
-    blocks: HashSet<Block>,
+    blocks: HashMap<IVec3, Block>,
     pos: IVec2,
 }
 
 impl Chunk {
     fn new(pos: IVec2) -> Self {
         Self {
-            blocks: HashSet::new(),
+            blocks: HashMap::new(),
             pos,
         }
     }
@@ -52,7 +73,7 @@ impl Chunk {
     fn gen_blocks(&mut self, noise: &NoiseMap) {
         let offset = IVec3::new(self.pos.x, 0, self.pos.y);
 
-        let blocks_mutex = Arc::new(Mutex::new(HashSet::new()));
+        let blocks_mutex = Arc::new(Mutex::new(HashMap::new()));
 
         (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
@@ -66,9 +87,19 @@ impl Chunk {
                 ) * CHUNK_SIZE as f64;
                 if (y as f64) < height {
                     let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
-                    let block = Block::new(block_pos);
+                    let block = {
+                        if y == 0 {
+                            Block::new(block_pos, BlockType::Bedrock)
+                        } else if y < 3 {
+                            Block::new(block_pos, BlockType::Stone)
+                        } else if y < 5 {
+                            Block::new(block_pos, BlockType::Dirt)
+                        } else {
+                            Block::new(block_pos, BlockType::Grass)
+                        }
+                    };
                     let mut blocks = blocks_mutex.lock().unwrap();
-                    blocks.insert(block);
+                    blocks.insert(block_pos, block);
                 }
             });
 
@@ -77,28 +108,28 @@ impl Chunk {
     }
 
     fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
-        let visible_blocks = self
-            .blocks
+        let temp = self.blocks.clone();
+        let visible_blocks = temp
             .par_iter()
             .filter(|block| {
-                let block_pos = block.position;
+                let block_pos = block.0;
                 let other_blocks = &self.blocks;
 
                 let surrounding = vec![
-                    Block::new(IVec3::new(block_pos.x - 1, block_pos.y, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y - 1, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z - 1)),
-                    Block::new(IVec3::new(block_pos.x + 1, block_pos.y, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y + 1, block_pos.z)),
-                    Block::new(IVec3::new(block_pos.x, block_pos.y, block_pos.z + 1)),
+                    IVec3::new(block_pos.x - 1, block_pos.y, block_pos.z),
+                    IVec3::new(block_pos.x, block_pos.y - 1, block_pos.z),
+                    IVec3::new(block_pos.x, block_pos.y, block_pos.z - 1),
+                    IVec3::new(block_pos.x + 1, block_pos.y, block_pos.z),
+                    IVec3::new(block_pos.x, block_pos.y + 1, block_pos.z),
+                    IVec3::new(block_pos.x, block_pos.y, block_pos.z + 1),
                 ];
 
-                !(other_blocks.contains(&surrounding[0])
-                    && other_blocks.contains(&surrounding[1])
-                    && other_blocks.contains(&surrounding[2])
-                    && other_blocks.contains(&surrounding[3])
-                    && other_blocks.contains(&surrounding[4])
-                    && other_blocks.contains(&surrounding[5]))
+                !(other_blocks.contains_key(&surrounding[0])
+                    && other_blocks.contains_key(&surrounding[1])
+                    && other_blocks.contains_key(&surrounding[2])
+                    && other_blocks.contains_key(&surrounding[3])
+                    && other_blocks.contains_key(&surrounding[4])
+                    && other_blocks.contains_key(&surrounding[5]))
             })
             .collect::<Vec<_>>();
 
@@ -109,7 +140,7 @@ impl Chunk {
         visible_blocks.par_iter().for_each(|block| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
-            let block_pos = block.position;
+            let block_pos = block.0;
             let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
             let block_pos = block_pos + BLOCK_SIZE;
 
@@ -165,17 +196,18 @@ impl Chunk {
             // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
-            new_meshes.lock().unwrap().insert(block.position, mesh);
+            new_meshes.lock().unwrap().insert(block.0, mesh);
         });
 
-        self.blocks
-            .retain(|block| !new_meshes.lock().unwrap().contains_key(&block.position));
+        // self.blocks
+        //     .retain(|pos, block| !new_meshes.lock().unwrap().contains_key(&pos));
 
         for (position, mesh) in new_meshes.lock().unwrap().iter() {
-            self.blocks.insert(Block {
-                position: *position,
-                mesh: meshes.add(mesh.clone()),
-            });
+            // Update the mesh in self.blocks
+            let mut block = self.blocks.get(&position).unwrap().to_owned();
+            block.mesh = meshes.add(mesh.clone());
+            let pos = IVec3::new(position.x, position.y, position.z);
+            self.blocks.insert(pos, block.clone());
         }
     }
 }
@@ -308,9 +340,8 @@ pub fn update_world(
             .with_children(|parent| {
                 for block in chunk.blocks.iter() {
                     parent.spawn(PbrBundle {
-                        mesh: block.mesh.clone(),
-                        material: materials
-                            .add(Color::rgb(126.0 / 255.0, 200.0 / 255.0, 80.0 / 255.0).into()),
+                        mesh: block.1.mesh.clone(),
+                        material: materials.add(block.1.btype.get_color().into()),
                         ..Default::default()
                     });
                 }
