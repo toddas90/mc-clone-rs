@@ -21,8 +21,16 @@ const RENDER_DISTANCE: i32 = 4; // In chunks
 // There's an included example of a system that toggles the "enabled"
 // property of the fly camera with "T"
 
-fn init(mut commands: Commands) {
-    // Change the Plugin's camera spawn position!
+fn init(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut atlas: ResMut<Assets<TextureAtlas>>,
+) {
+    let texture: Handle<Image> = asset_server.load("../resources/alpha_atlas.png");
+
+    // Save the texture handle so we can use it later.
+    let texture_atlas = TextureAtlas::from_grid(texture, Vec2::new(16., 16.), 16, 16, None, None);
+    atlas.add(texture_atlas);
 
     // directional 'sun' light
     commands.spawn(DirectionalLightBundle {

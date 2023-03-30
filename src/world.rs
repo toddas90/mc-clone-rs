@@ -44,14 +44,38 @@ pub enum BlockType {
 }
 
 impl BlockType {
-    fn get_color(&self) -> Color {
+    fn get_material(&self) -> StandardMaterial {
+        // Reflectance and perceptual roughness are random. Fix later.
         match self {
-            // Colors from https://encycolorpedia.com/
-            BlockType::Grass => Color::hex("91cb7d").unwrap(),
-            BlockType::Dirt => Color::hex("9b7653").unwrap(),
-            BlockType::Stone => Color::hex("9f9484").unwrap(),
-            BlockType::Water => Color::hex("4977867F").unwrap(), // 497786
-            BlockType::Air => Color::hex("000000").unwrap(),
+            BlockType::Grass => StandardMaterial {
+                base_color: Color::hex("91cb7d").unwrap(),
+                reflectance: 0.1,
+                perceptual_roughness: 0.1,
+                ..Default::default()
+            },
+            BlockType::Dirt => StandardMaterial {
+                base_color: Color::hex("9b7653").unwrap(),
+                reflectance: 0.1,
+                perceptual_roughness: 0.1,
+                ..Default::default()
+            },
+            BlockType::Stone => StandardMaterial {
+                base_color: Color::hex("9f9484").unwrap(),
+                reflectance: 0.1,
+                perceptual_roughness: 0.1,
+                ..Default::default()
+            },
+            BlockType::Water => StandardMaterial {
+                base_color: Color::hex("4977867F").unwrap(),
+                reflectance: 0.2,
+                perceptual_roughness: 0.1,
+                alpha_mode: AlphaMode::Blend,
+                ..Default::default()
+            },
+            BlockType::Air => StandardMaterial {
+                base_color: Color::hex("000000").unwrap(),
+                ..Default::default()
+            },
         }
     }
 }
@@ -110,7 +134,7 @@ impl Chunk {
             .extend(Arc::try_unwrap(blocks_mutex).unwrap().into_inner().unwrap());
     }
 
-    fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>) {
+    fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>, atlas: &Res<Assets<TextureAtlas>>) {
         // Find the blocks that are not buried.
         let temp = self.blocks.clone();
         let visible_blocks = temp
@@ -198,7 +222,44 @@ impl Chunk {
                 Mesh::ATTRIBUTE_NORMAL,
                 vec![[0., 1., 0.]; block_verticies.len()],
             );
-            // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
+
+            // Grass Sides 1, 10.
+            // Grass Top 19, 1.
+            // Grass Bottom 8, 5
+            // Dirt 8, 5
+            // Stone 19, 6
+            // Water 1, 0
+            // match block.1.btype {
+            //     BlockType::Grass => {
+            //         let text_1 = vec![[1, 10]; 12];
+            //         let text_2 = vec![[19, 1]; 4];
+            //         let text_3 = vec![[8, 5]; 4];
+            //         let texture = [text_1, text_2, text_3].concat();
+            //         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, texture);
+            //     }
+            //     BlockType::Dirt => {
+            //         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[8, 5]; 24]);
+            //     }
+            //     BlockType::Stone => {
+            //         mesh.insert_attribute(
+            //             Mesh::ATTRIBUTE_UV_0,
+            //             vec![[19, 6]; block_verticies.len()],
+            //         );
+            //     }
+            //     BlockType::Water => {
+            //         mesh.insert_attribute(
+            //             Mesh::ATTRIBUTE_UV_0,
+            //             vec![[1, 0]; block_verticies.len()],
+            //         );
+            //     }
+            //     _ => {
+            //         mesh.insert_attribute(
+            //             Mesh::ATTRIBUTE_UV_0,
+            //             vec![[29, 17]; block_verticies.len()],
+            //         );
+            //     }
+            // }
+
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
             new_meshes.lock().unwrap().insert(block.0, mesh);
@@ -254,6 +315,7 @@ pub fn update_world(
     mut map: ResMut<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    atlas: Res<Assets<TextureAtlas>>,
     camera: Query<&Transform, With<FlyCam>>,
     entities: Query<(Entity, &Chunk), With<Chunk>>,
 ) {
@@ -335,7 +397,7 @@ pub fn update_world(
             } else {
                 let mut chunk = Chunk::new(*chunk_pos);
                 chunk.gen_blocks(&map.noise);
-                chunk.gen_meshes(&mut meshes);
+                chunk.gen_meshes(&mut meshes, &atlas);
                 map.chunks.insert(*chunk_pos, chunk);
             }
         }
@@ -351,7 +413,7 @@ pub fn update_world(
                 for block in chunk.blocks.iter() {
                     parent.spawn(PbrBundle {
                         mesh: block.1.mesh.clone(),
-                        material: materials.add(block.1.btype.get_color().into()),
+                        material: materials.add(block.1.btype.get_material().clone()),
                         transform: Transform::from_translation(Vec3::new(
                             block.0.x as f32,
                             block.0.y as f32,
