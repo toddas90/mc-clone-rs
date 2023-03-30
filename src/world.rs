@@ -40,8 +40,7 @@ pub enum BlockType {
     Dirt,
     Stone,
     Water,
-    Bedrock,
-    Air,
+    Air, // Essentially null
 }
 
 impl BlockType {
@@ -52,7 +51,6 @@ impl BlockType {
             BlockType::Dirt => Color::hex("9b7653").unwrap(),
             BlockType::Stone => Color::hex("9f9484").unwrap(),
             BlockType::Water => Color::hex("497786").unwrap(),
-            BlockType::Bedrock => Color::hex("4d4e52").unwrap(),
             BlockType::Air => Color::hex("000000").unwrap(),
         }
     }
@@ -63,51 +61,23 @@ impl BlockType {
 #[derive(Component, Clone)]
 pub struct Chunk {
     blocks: HashMap<IVec3, Block>,
-    pos: IVec2,
+    position: IVec2,
 }
 
 impl Chunk {
     fn new(pos: IVec2) -> Self {
         Self {
             blocks: HashMap::new(),
-            pos,
+            position: pos,
         }
     }
 
     fn gen_blocks(&mut self, noise: &NoiseMap) {
-        let offset = IVec3::new(self.pos.x, 0, self.pos.y);
+        let offset = IVec3::new(self.position.x, 0, self.position.y);
 
         let blocks_mutex = Arc::new(Mutex::new(HashMap::new()));
 
-        // Iterate through the blocks and create them. Meshes are handled elsewhere.
-        // (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
-        //     .into_par_iter()
-        //     .rev()
-        //     .for_each(|i| {
-        //         let x = i % CHUNK_SIZE;
-        //         let z = (i / CHUNK_SIZE) % CHUNK_SIZE;
-        //         let y = i / (CHUNK_SIZE * CHUNK_SIZE);
-        //         let height = noise.get_value((x + offset.x) as usize, (z + offset.z) as usize)
-        //             * CHUNK_SIZE as f64;
-        //         if (y as f64) < height {
-        //             let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
-        //             let upper_block_pos = IVec3::new(x, (y + 1) % CHUNK_SIZE, z) + offset;
-        //             let block = {
-        //                 if y == 0 {
-        //                     Block::new(BlockType::Bedrock)
-        //                 } else if y < 3 && self.blocks.contains_key(&upper_block_pos) {
-        //                     Block::new(BlockType::Stone)
-        //                 } else if y < 5 && self.blocks.contains_key(&upper_block_pos) {
-        //                     Block::new(BlockType::Dirt)
-        //                 } else {
-        //                     Block::new(BlockType::Grass)
-        //                 }
-        //             };
-        //             let mut blocks = blocks_mutex.lock().unwrap();
-        //             blocks.insert(block_pos, block);
-        //         }
-        //     });
-
+        // With water
         (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
             .for_each(|i| {
@@ -120,11 +90,6 @@ impl Chunk {
                 let block_pos = IVec3::new(x, y, z) + offset;
 
                 let mut blocks = blocks_mutex.lock().unwrap();
-
-                // Check if a block already exists at the current position
-                if blocks.get(&block_pos).is_some() {
-                    return;
-                }
 
                 if (y as f64) < height.abs() {
                     let block = if y < 4 {
@@ -231,40 +196,11 @@ impl Chunk {
                 Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
             ];
 
-            // If water or bedrock, only render the top face
-            // if block.1.btype == BlockType::Water || block.1.btype == BlockType::Bedrock {
-            //     mesh.insert_attribute(
-            //         Mesh::ATTRIBUTE_NORMAL,
-            //         vec![
-            //             Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
-            //             Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
-            //             Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
-            //             Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
-            //         ],
-            //     );
-
-            //     mesh.insert_attribute(
-            //         Mesh::ATTRIBUTE_UV_0,
-            //         vec![
-            //             Vec2::new(0.0, 0.0),
-            //             Vec2::new(1.0, 0.0),
-            //             Vec2::new(1.0, 1.0),
-            //             Vec2::new(0.0, 1.0),
-            //         ],
-            //     );
-
-            //     mesh.set_indices(Some(Indices::U32(vec![3, 2, 7, 7, 2, 6])));
-            //     new_meshes.lock().unwrap().insert(block.0, mesh);
-            //     return;
-            // }
-
-            // In this example, normals and UVs don't matter,
-            // so we just use the same value for all of them
             mesh.insert_attribute(
                 Mesh::ATTRIBUTE_NORMAL,
                 vec![[0., 1., 0.]; block_verticies.len()],
             );
-            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
+            // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
             new_meshes.lock().unwrap().insert(block.0, mesh);
@@ -359,7 +295,7 @@ pub fn update_world(
 
     // Despawn the chunks.
     for (entity, chunk) in entities.iter() {
-        if !map.chunks.contains_key(&chunk.pos) {
+        if !map.chunks.contains_key(&chunk.position) {
             commands.entity(entity).despawn_recursive();
         }
     }
@@ -405,11 +341,13 @@ pub fn update_world(
                 map.chunks.insert(*chunk_pos, chunk);
             }
         }
+
         let chunk = map.chunks.get(chunk_pos).unwrap();
+
         commands
             .spawn(Chunk {
                 blocks: chunk.blocks.clone(),
-                pos: chunk.pos,
+                position: chunk.position,
             })
             .with_children(|parent| {
                 for block in chunk.blocks.iter() {
