@@ -66,7 +66,7 @@ impl BlockType {
                 ..Default::default()
             },
             BlockType::Water => StandardMaterial {
-                base_color: Color::hex("4977867F").unwrap(),
+                base_color: Color::hex("497786BF").unwrap(), // 7F == 0.5 alpha
                 reflectance: 0.2,
                 perceptual_roughness: 0.1,
                 alpha_mode: AlphaMode::Blend,
@@ -378,6 +378,8 @@ pub fn update_world(
         player_pos + IVec2::new(-CHUNK_SIZE, CHUNK_SIZE),
         player_pos + IVec2::new(CHUNK_SIZE, -CHUNK_SIZE),
     ];
+
+    // Need to sort the blocks so that the ones closer are rendered first.
 
     // Remove chunks that are already loaded or cached.
     new_chunks.retain(|chunk_pos| !map.chunks.contains_key(chunk_pos));
