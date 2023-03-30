@@ -16,7 +16,7 @@ const CHUNK_SIZE: i32 = 32;
 const SEED: u32 = 14;
 const BLOCK_SIZE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const RENDER_DISTANCE: i32 = 3; // In chunks
-const WATER_LEVEL: i32 = 6;
+const WATER_LEVEL: i32 = 7;
 
 // ---------- Block ----------
 #[derive(Component, Clone, PartialEq, Eq, Hash, Debug)]
@@ -87,7 +87,8 @@ impl Chunk {
         //         let x = i % CHUNK_SIZE;
         //         let z = (i / CHUNK_SIZE) % CHUNK_SIZE;
         //         let y = i / (CHUNK_SIZE * CHUNK_SIZE);
-        //         let height = noise.get_value((x + offset.x) as usize, (z + offset.z) as usize) * CHUNK_SIZE as f64;
+        //         let height = noise.get_value((x + offset.x) as usize, (z + offset.z) as usize)
+        //             * CHUNK_SIZE as f64;
         //         if (y as f64) < height {
         //             let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
         //             let upper_block_pos = IVec3::new(x, (y + 1) % CHUNK_SIZE, z) + offset;
@@ -116,25 +117,28 @@ impl Chunk {
                 let height = noise.get_value((x + offset.x) as usize, (z + offset.z) as usize)
                     * CHUNK_SIZE as f64;
 
-                let block_pos = IVec3::new(x, y % CHUNK_SIZE, z) + offset;
-                let block = if y == 0 {
-                    Block::new(BlockType::Bedrock)
-                } else if (y as f64) < height {
-                    if y < 3 {
+                let block_pos = IVec3::new(x, y, z) + offset;
+
+                let mut blocks = blocks_mutex.lock().unwrap();
+
+                // Check if a block already exists at the current position
+                if blocks.get(&block_pos).is_some() {
+                    return;
+                }
+
+                if (y as f64) < height.abs() {
+                    let block = if y < 4 {
                         Block::new(BlockType::Stone)
-                    } else if y < 5 {
+                    } else if y < 7 {
                         Block::new(BlockType::Dirt)
                     } else {
                         Block::new(BlockType::Grass)
-                    }
+                    };
+                    blocks.insert(block_pos, block);
                 } else if y == WATER_LEVEL {
-                    Block::new(BlockType::Water)
-                } else {
-                    Block::new(BlockType::Air) // BAD
-                };
-
-                let mut blocks = blocks_mutex.lock().unwrap();
-                blocks.insert(block_pos, block);
+                    let block = Block::new(BlockType::Water);
+                    blocks.insert(block_pos, block);
+                }
             });
 
         self.blocks
@@ -166,6 +170,12 @@ impl Chunk {
                     && other_blocks.contains_key(&surrounding[4])
                     && other_blocks.contains_key(&surrounding[5]))
             })
+            .collect::<Vec<_>>();
+
+        // Filter out Air blocks.
+        let visible_blocks = visible_blocks
+            .par_iter()
+            .filter(|block| block.1.btype != BlockType::Air)
             .collect::<Vec<_>>();
 
         let new_meshes = Arc::new(Mutex::new(HashMap::new()));
@@ -221,18 +231,32 @@ impl Chunk {
                 Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
             ];
 
-            // If water, only render the top face
-            if block.1.btype == BlockType::Water {
-                mesh.insert_attribute(
-                    Mesh::ATTRIBUTE_NORMAL,
-                    vec![[0., 1., 0.]; block_verticies.len()],
-                );
-                mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[1., 1.]; block_verticies.len()]);
-                mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
-                mesh.set_indices(Some(Indices::U32(block_indicies)));
-                new_meshes.lock().unwrap().insert(block.0, mesh);
-                return;
-            }
+            // If water or bedrock, only render the top face
+            // if block.1.btype == BlockType::Water || block.1.btype == BlockType::Bedrock {
+            //     mesh.insert_attribute(
+            //         Mesh::ATTRIBUTE_NORMAL,
+            //         vec![
+            //             Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+            //             Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z - 1.0),
+            //             Vec3::new(block_pos.x + 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+            //             Vec3::new(block_pos.x - 1.0, block_pos.y + 1.0, block_pos.z + 1.0),
+            //         ],
+            //     );
+
+            //     mesh.insert_attribute(
+            //         Mesh::ATTRIBUTE_UV_0,
+            //         vec![
+            //             Vec2::new(0.0, 0.0),
+            //             Vec2::new(1.0, 0.0),
+            //             Vec2::new(1.0, 1.0),
+            //             Vec2::new(0.0, 1.0),
+            //         ],
+            //     );
+
+            //     mesh.set_indices(Some(Indices::U32(vec![3, 2, 7, 7, 2, 6])));
+            //     new_meshes.lock().unwrap().insert(block.0, mesh);
+            //     return;
+            // }
 
             // In this example, normals and UVs don't matter,
             // so we just use the same value for all of them
