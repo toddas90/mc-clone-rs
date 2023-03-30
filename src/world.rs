@@ -50,7 +50,7 @@ impl BlockType {
             BlockType::Grass => Color::hex("91cb7d").unwrap(),
             BlockType::Dirt => Color::hex("9b7653").unwrap(),
             BlockType::Stone => Color::hex("9f9484").unwrap(),
-            BlockType::Water => Color::hex("497786").unwrap(),
+            BlockType::Water => Color::hex("4977867F").unwrap(), // 497786
             BlockType::Air => Color::hex("000000").unwrap(),
         }
     }
@@ -149,9 +149,7 @@ impl Chunk {
         visible_blocks.par_iter().for_each(|block| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
-            let block_pos = block.0;
-            let block_pos = Vec3::new(block_pos.x as f32, block_pos.y as f32, block_pos.z as f32);
-            let block_pos = block_pos + BLOCK_SIZE;
+            let block_pos = block.0.as_vec3();
 
             let block_indicies = vec![
                 0, 1, 3, 3, 1, 2, // Front
@@ -354,6 +352,11 @@ pub fn update_world(
                     parent.spawn(PbrBundle {
                         mesh: block.1.mesh.clone(),
                         material: materials.add(block.1.btype.get_color().into()),
+                        transform: Transform::from_translation(Vec3::new(
+                            block.0.x as f32,
+                            block.0.y as f32,
+                            block.0.z as f32,
+                        )),
                         ..Default::default()
                     });
                 }
