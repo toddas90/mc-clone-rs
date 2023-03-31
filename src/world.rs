@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
-use bevy::render::render_resource::PrimitiveTopology;
+use bevy::render::render_resource::{PrimitiveTopology, Texture};
 // use bevy_flycam::FlyCam;
 use cam::*;
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
@@ -134,7 +134,12 @@ impl Chunk {
             .extend(Arc::try_unwrap(blocks_mutex).unwrap().into_inner().unwrap());
     }
 
-    fn gen_meshes(&mut self, meshes: &mut ResMut<Assets<Mesh>>, atlas: &Res<Assets<TextureAtlas>>) {
+    fn gen_meshes(
+        &mut self,
+        meshes: &mut ResMut<Assets<Mesh>>,
+        atlas_handle: Handle<TextureAtlas>,
+        atlas: &Res<Assets<TextureAtlas>>,
+    ) {
         // Find the blocks that are not buried.
         let temp = self.blocks.clone();
         let visible_blocks = temp
@@ -218,50 +223,171 @@ impl Chunk {
                 Vec3::new(block_pos.x - 1.0, block_pos.y - 1.0, block_pos.z + 1.0),
             ];
 
+            let mut texture_indices = Vec::new();
+
+            match block.1.btype {
+                BlockType::Grass => {
+                    texture_indices = vec![
+                        [1, 10],
+                        [1, 10],
+                        [1, 10],
+                        [1, 10], // Front
+                        [4, 8],
+                        [4, 8],
+                        [4, 8],
+                        [4, 8], // Back
+                        [3, 5],
+                        [3, 5],
+                        [3, 5],
+                        [3, 5], // Left
+                        [2, 9],
+                        [2, 9],
+                        [2, 9],
+                        [2, 9], // Right
+                        [16, 1],
+                        [16, 1],
+                        [16, 1],
+                        [16, 1], // Top
+                        [15, 5],
+                        [15, 5],
+                        [15, 5],
+                        [15, 5], // Bottom
+                    ];
+                }
+                BlockType::Dirt => {
+                    texture_indices = vec![
+                        [3, 5],
+                        [3, 5],
+                        [3, 5],
+                        [3, 5], // Front
+                        [3, 5],
+                        [3, 5],
+                        [3, 5],
+                        [3, 5], // Back
+                        [3, 5],
+                        [3, 5],
+                        [3, 5],
+                        [3, 5], // Left
+                        [3, 5],
+                        [3, 5],
+                        [3, 5],
+                        [3, 5], // Right
+                        [15, 5],
+                        [15, 5],
+                        [15, 5],
+                        [15, 5], // Top
+                        [15, 5],
+                        [15, 5],
+                        [15, 5],
+                        [15, 5], // Bottom
+                    ];
+                }
+                BlockType::Stone => {
+                    texture_indices = vec![
+                        [14, 3],
+                        [14, 3],
+                        [14, 3],
+                        [14, 3], // Front
+                        [14, 3],
+                        [14, 3],
+                        [14, 3],
+                        [14, 3], // Back
+                        [14, 3],
+                        [14, 3],
+                        [14, 3],
+                        [14, 3], // Left
+                        [14, 3],
+                        [14, 3],
+                        [14, 3],
+                        [14, 3], // Right
+                        [13, 1],
+                        [13, 1],
+                        [13, 1],
+                        [13, 1], // Top
+                        [12, 3],
+                        [12, 3],
+                        [12, 3],
+                        [12, 3], // Bottom
+                    ];
+                }
+                BlockType::Water => {
+                    texture_indices = vec![
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Front
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Back
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Left
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Right
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Top
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0], // Bottom
+                    ];
+                }
+                _ => {
+                    texture_indices = vec![
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Front
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Back
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Left
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Right
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Top
+                        [4, 15],
+                        [4, 15],
+                        [4, 15],
+                        [4, 15], // Bottom
+                    ];
+                }
+            }
+
+            let atlas_info = &atlas.get(&atlas_handle).unwrap().textures;
+            // HOW DO I LINK THE UV_O_POSITION WITH THE TEXTURE ATLAS????
+
+            // Let temp be the texture indicies as a Vec<Vec2>
+            let mut temp = Vec::new();
+            for i in 0..texture_indices.len() {
+                let x = texture_indices[i][0] as f32 / 16.0;
+                let y = texture_indices[i][1] as f32 / 16.0;
+                temp.push(Vec2::new(x, y));
+            }
+
             mesh.insert_attribute(
                 Mesh::ATTRIBUTE_NORMAL,
                 vec![[0., 1., 0.]; block_verticies.len()],
             );
 
-            // Grass Sides 1, 10.
-            // Grass Top 19, 1.
-            // Grass Bottom 8, 5
-            // Dirt 8, 5
-            // Stone 19, 6
-            // Water 1, 0
-            // match block.1.btype {
-            //     BlockType::Grass => {
-            //         let text_1 = vec![[1, 10]; 12];
-            //         let text_2 = vec![[19, 1]; 4];
-            //         let text_3 = vec![[8, 5]; 4];
-            //         let texture = [text_1, text_2, text_3].concat();
-            //         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, texture);
-            //     }
-            //     BlockType::Dirt => {
-            //         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[8, 5]; 24]);
-            //     }
-            //     BlockType::Stone => {
-            //         mesh.insert_attribute(
-            //             Mesh::ATTRIBUTE_UV_0,
-            //             vec![[19, 6]; block_verticies.len()],
-            //         );
-            //     }
-            //     BlockType::Water => {
-            //         mesh.insert_attribute(
-            //             Mesh::ATTRIBUTE_UV_0,
-            //             vec![[1, 0]; block_verticies.len()],
-            //         );
-            //     }
-            //     _ => {
-            //         mesh.insert_attribute(
-            //             Mesh::ATTRIBUTE_UV_0,
-            //             vec![[29, 17]; block_verticies.len()],
-            //         );
-            //     }
-            // }
-
+            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, temp);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, block_verticies);
             mesh.set_indices(Some(Indices::U32(block_indicies)));
+
             new_meshes.lock().unwrap().insert(block.0, mesh);
         });
 
@@ -285,6 +411,7 @@ pub struct Map {
     chunks: HashMap<IVec2, Chunk>,
     cache: HashMap<IVec2, Chunk>,
     noise: NoiseMap,
+    pub texture_atlas: Handle<TextureAtlas>,
 }
 
 impl FromWorld for Map {
@@ -301,6 +428,7 @@ impl FromWorld for Map {
             chunks: HashMap::new(),
             cache: HashMap::new(),
             noise: height_map,
+            texture_atlas: Handle::default(),
         }
     }
 }
@@ -399,7 +527,7 @@ pub fn update_world(
             } else {
                 let mut chunk = Chunk::new(*chunk_pos);
                 chunk.gen_blocks(&map.noise);
-                chunk.gen_meshes(&mut meshes, &atlas);
+                chunk.gen_meshes(&mut meshes, map.texture_atlas.clone(), &atlas);
                 map.chunks.insert(*chunk_pos, chunk);
             }
         }

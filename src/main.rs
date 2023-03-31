@@ -25,13 +25,8 @@ fn init(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut atlas: ResMut<Assets<TextureAtlas>>,
+    mut map: ResMut<Map>,
 ) {
-    let texture: Handle<Image> = asset_server.load("../resources/alpha_atlas.png");
-
-    // Save the texture handle so we can use it later.
-    let texture_atlas = TextureAtlas::from_grid(texture, Vec2::new(16., 16.), 16, 16, None, None);
-    atlas.add(texture_atlas);
-
     // directional 'sun' light
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
@@ -53,6 +48,11 @@ fn init(
         .into(),
         ..default()
     });
+
+    let texture: Handle<Image> = asset_server.load("../resources/alpha_atlas.png");
+    // Save the texture handle so we can use it later.
+    let texture_atlas = TextureAtlas::from_grid(texture, Vec2::new(16., 16.), 16, 16, None, None);
+    map.texture_atlas = atlas.add(texture_atlas);
 }
 
 fn main() {
@@ -70,8 +70,8 @@ fn main() {
         // .add_plugin(LogDiagnosticsPlugin::default())
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(PlayerPlugin)
-        .init_resource::<Map>()
         .add_startup_system(init)
+        .init_resource::<Map>()
         .add_system(update_world)
         .run();
 }
